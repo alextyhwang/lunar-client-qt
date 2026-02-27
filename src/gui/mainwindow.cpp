@@ -5,16 +5,12 @@
 #include "mainwindow.h"
 
 #include <QCoreApplication>
-#include <QGridLayout>
-#include <QListWidgetItem>
-#include <QComboBox>
+#include <QVBoxLayout>
 #include <QStatusBar>
-#include <QScrollArea>
 #include <QStandardPaths>
 #include <QJsonDocument>
 #include <QFileSystemModel>
 #include <QIODevice>
-#include <QLabel>
 
 #include "pages/configurationpage.h"
 #include "pages/gamepage.h"
@@ -49,16 +45,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
     }
     
 
-    QWidget* centralWidget = new QWidget();
+    launchButton = new QPushButton();
+    launchButton->setMinimumHeight(80);
+    connect(launchButton, &QPushButton::clicked, this, &MainWindow::launchOrEndProcess);
 
-    QGridLayout* mainLayout = new QGridLayout();
-
-    pageList = new QListWidget();
-    pageStack = new QStackedWidget();
-
-    pageStack->setContentsMargins(30, 10, 30, 10);
-
-    pageList->setIconSize(QSize(32, 32));
+    tabWidget = new QTabWidget();
+    tabWidget->setContentsMargins(30, 10, 30, 10);
 
     pages = {
         new GamePage(config),
@@ -69,23 +61,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
     };
     logsPage = static_cast<LogsPage*>(pages.last());
 
-    for(ConfigurationPage* page : pages){
-        new QListWidgetItem(page->icon(), page->title(), pageList);
-        pageStack->addWidget(page);
+    for (ConfigurationPage* page : pages) {
+        tabWidget->addTab(page, page->icon(), page->title());
     }
-
-    connect(pageList, &QListWidget::currentRowChanged, pageStack, &QStackedWidget::setCurrentIndex);
-
-    pageList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    pageList->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
-    pageList->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
-    QFont font;
-    font.setPointSize(11);
-    pageList->setFont(font);
-
-    launchButton = new QPushButton();
-    launchButton->setMinimumHeight(80);
-    connect(launchButton, &QPushButton::clicked, this, &MainWindow::launchOrEndProcess);
 
     connect(&offlineLauncher, &OfflineLauncher::error, this, &MainWindow::errorCallback);
     connect(&offlineLauncher, &OfflineLauncher::processStarted, this, &MainWindow::updateLaunchButtonState);
@@ -97,53 +75,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
 
     resetLaunchButtons();
 
-    mainLayout->addWidget(pageList);
-    mainLayout->addWidget(launchButton, 2, 0);
-
-
-    QFrame *frame = new QFrame;
-    frame->setFrameShape(QFrame::StyledPanel);
-    frame->setFrameShadow(QFrame::Sunken);
-
-    QLabel *title = new QLabel;
-    QFont titleFont;
-    titleFont.setPointSize(13);
-    title->setFont(titleFont);
-    QLabel *description = new QLabel;
-
-    QVBoxLayout *frameLayout = new QVBoxLayout(frame);
-
-#ifdef INCLUDE_UPDATER
-    QHBoxLayout *titleBtnLayout = new QHBoxLayout;
-    QPushButton *checkForUpdates = new QPushButton("Check for updates");
-    titleBtnLayout->addWidget(title, 1);
-    titleBtnLayout->addWidget(checkForUpdates);
-
-    frameLayout->addLayout(titleBtnLayout);
-
-    connect(checkForUpdates, &QPushButton::clicked, [this]{updaterChecker.checkForUpdates(true);});
-#else
-    frameLayout->addWidget(title);
-#endif
-    frameLayout->addWidget(description);
-
-
-    connect(pageList, &QListWidget::currentRowChanged, [this, title, description](int current) {
-        if (current >= 0 && current < pages.size()) {
-            title->setText(pages[current]->title());
-            description->setText(pages[current]->description());
-        }
-    });
-
-    pageList->setCurrentRow(0);
-
-    QVBoxLayout *layout = new QVBoxLayout;
-    layout->addWidget(frame);
-    layout->addWidget(pageStack, 1);
-    mainLayout->addLayout(layout, 0, 1, -1, 1);
+    QVBoxLayout* mainLayout = new QVBoxLayout();
+    mainLayout->addWidget(launchButton);
+    mainLayout->addWidget(tabWidget, 1);
 
     setCentralWidget(WidgetUtils::layoutToWidget(mainLayout));
-    resize(800, 600);
+    setFixedSize(570, 750);
 
     load();
 
@@ -180,7 +117,7 @@ void MainWindow::launchOrEndProcess() {
     if (offlineLauncher.launch()) {
         if (logsPage) {
             logsPage->startPolling();
-            pageList->setCurrentRow(pages.indexOf(logsPage));
+            tabWidget->setCurrentIndex(pages.indexOf(logsPage));
         }
         if (config.closeOnLaunch)
             close();
@@ -212,7 +149,7 @@ void MainWindow::errorCallback(const QString &message) {
     statusBar()->showMessage(message, 10000);
     if (logsPage) {
         logsPage->stopPolling();
-        pageList->setCurrentRow(pages.indexOf(logsPage));
+        tabWidget->setCurrentIndex(pages.indexOf(logsPage));
         logsPage->appendToMainLog(QStringLiteral("[Launcher Error] ") + message);
     }
 }

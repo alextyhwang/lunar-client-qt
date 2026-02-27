@@ -6,8 +6,7 @@
 #define LUNAR_CLIENT_QT_MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QListWidget>
-#include <QStackedWidget>
+#include <QTabWidget>
 #include <QPushButton>
 #include <QTimer>
 #include <QStandardPaths>
@@ -46,8 +45,7 @@ private slots:
     void noUpdatesAvailable();
 #endif
 private:
-    QListWidget* pageList;
-    QStackedWidget* pageStack;
+    QTabWidget* tabWidget;
     QPushButton* launchButton;
 
     QList<ConfigurationPage*> pages;
