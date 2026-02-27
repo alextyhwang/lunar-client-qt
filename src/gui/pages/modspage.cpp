@@ -11,6 +11,8 @@
 #include <QProxyStyle>
 #include <QHeaderView>
 #include <QItemSelectionModel>
+#include <QDesktopServices>
+#include <QUrl>
 
 ModsPage::ModsPage(Config& config, QWidget* parent) : ConfigurationPage(config, parent) {
 	QVBoxLayout* mainLayout = new QVBoxLayout();
@@ -26,6 +28,7 @@ ModsPage::ModsPage(Config& config, QWidget* parent) : ConfigurationPage(config, 
 		remove = new QPushButton(QStringLiteral("Remove"));
 		moveUp = new QPushButton(QStringLiteral("Move Up"));
 		moveDown = new QPushButton(QStringLiteral("Move Down"));
+        openFolder = new QPushButton(QStringLiteral("Open Folder"));
 
 		connect(mods->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ModsPage::onSelect);
 
@@ -74,13 +77,18 @@ ModsPage::ModsPage(Config& config, QWidget* parent) : ConfigurationPage(config, 
 			}
 			});
 
+        connect(openFolder, &QPushButton::clicked, []() {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(FS::getWeaveModsDirectory()));
+        });
+
 		QGridLayout* modsContainer = new QGridLayout();
 		modsContainer->setSpacing(6);
-		modsContainer->addWidget(mods, 0, 0, 5, 1);
+		modsContainer->addWidget(mods, 0, 0, 6, 1);
 		modsContainer->addWidget(add, 0, 1);
 		modsContainer->addWidget(remove, 1, 1);
 		modsContainer->addWidget(moveUp, 2, 1);
 		modsContainer->addWidget(moveDown, 3, 1);
+        modsContainer->addWidget(openFolder, 4, 1);
 
 		mainLayout->addLayout(modsContainer, 1);
 

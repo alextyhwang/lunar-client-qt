@@ -39,6 +39,7 @@ private:
     QCheckBox* useCustomJre;
     FileChooser* jrePath;
 
+    QPushButton* openDataFolder;
     QRadioButton* closeOnLaunch;
 
     QPlainTextEdit* jvmArgs;

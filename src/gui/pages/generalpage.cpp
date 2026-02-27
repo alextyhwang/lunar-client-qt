@@ -14,6 +14,9 @@
 
 #include "gui/widgets/filechooser.h"
 #include "gui/widgets/widgetutils.h"
+#include <QDesktopServices>
+#include <QUrl>
+#include <QStandardPaths>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -96,13 +99,17 @@ GeneralPage::GeneralPage(Config& config, QWidget *parent) : ConfigurationPage(co
     radioLayout->addWidget(closeOnLaunch);
     groupBox->setLayout(radioLayout);
 
+    openDataFolder = new QPushButton(QStringLiteral("Open Configuration Folder"));
+    connect(openDataFolder, &QPushButton::clicked, []() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/lunar-client-qt/"));
+    });
 
     mainLayout->addWidget(keepMemorySame, 0, Qt::AlignHCenter);
     mainLayout->addLayout(memorySliderContainer);
     mainLayout->addLayout(WidgetUtils::createOptional(useCustomJre, jrePath));
     mainLayout->addLayout(jvmArgsGroup, 1);
     mainLayout->addWidget(groupBox);
-
+    mainLayout->addWidget(openDataFolder, 0, Qt::AlignHCenter);
 
     setLayout(mainLayout);
 }

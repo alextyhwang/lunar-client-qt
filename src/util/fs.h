@@ -16,6 +16,7 @@ namespace FS {
     QString getAgentsDirectory();
 
     QString getLunarDirectory();
+    QString getLunarAccountsPath();
     QString getMinecraftDirectory();
     QString getWeaveModsDirectory();
 };

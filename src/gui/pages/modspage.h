@@ -35,6 +35,7 @@ private:
     QPushButton* remove;
     QPushButton* moveUp;
     QPushButton* moveDown;
+    QPushButton* openFolder;
 };
 
 
