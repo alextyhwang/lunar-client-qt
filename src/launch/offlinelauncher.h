@@ -6,6 +6,7 @@
 #define LUNAR_CLIENT_QT_OFFLINELAUNCHER_H
 
 #include <QObject>
+#include <QProcess>
 
 #include "launcher.h"
 
@@ -16,11 +17,24 @@ public:
     explicit OfflineLauncher(const Config& config, const bool useCustomAssetIndex, const QString& customAssetIndex, QObject* parent = nullptr);
 
     bool launch();
+    bool isProcessRunning() const;
+    void endProcess();
+
 signals:
     void error(const QString& message);
+    void processStarted();
+    void processFinished();
+
+private slots:
+    void onProcessFinished(int exitCode, QProcess::ExitStatus status);
+
 private:
     static QString findJavaExecutable();
     static void HelperLaunch(const QString& helper);
+    static bool isPidRunning(qint64 pid);
+
+    QProcess* process = nullptr;
+    qint64 launchedPid = 0;
 };
 
 

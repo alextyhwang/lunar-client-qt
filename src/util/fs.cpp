@@ -39,6 +39,10 @@ QString FS::getLunarAccountsPath() {
     return combinePaths(getLunarDirectory(), "settings", "game", "accounts.json");
 }
 
+QString FS::getLunarLogsPath() {
+    return combinePaths(getLunarDirectory(), "logs", "launcher");
+}
+
 QString FS::getMinecraftDirectory() {
     return combinePaths(
             QDir::homePath(),

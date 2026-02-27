@@ -9,16 +9,17 @@
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QPushButton>
-#include <QComboBox>
+#include <QTimer>
 #include <QStandardPaths>
 
 #include "launch/offlinelauncher.h"
 #include "launch/launcher.h"
 #include "pages/configurationpage.h"
-#include "pages/generalpage.h"
+#include "pages/gamepage.h"
 #include "pages/agentspage.h"
 #include "pages/modspage.h"
 #include "pages/helperspage.h"
+#include "pages/logspage.h"
 #include "config/config.h"
 
 #ifdef INCLUDE_UPDATER
@@ -31,12 +32,13 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
 
 private:
-    void launch();
+    void launchOrEndProcess();
     void closeEvent(QCloseEvent* closeEvent) override;
     void apply();
     void load();
 private slots:
     void resetLaunchButtons();
+    void updateLaunchButtonState();
     void errorCallback(const QString& message);
 
 #ifdef INCLUDE_UPDATER
@@ -47,12 +49,12 @@ private:
     QListWidget* pageList;
     QStackedWidget* pageStack;
     QPushButton* launchButton;
-    QComboBox* versionSelect;
-    QComboBox* modLoaderSelect;
 
     QList<ConfigurationPage*> pages;
 
     OfflineLauncher offlineLauncher;
+    LogsPage* logsPage = nullptr;
+    QTimer* processCheckTimer = nullptr;
 
     Config config;
 

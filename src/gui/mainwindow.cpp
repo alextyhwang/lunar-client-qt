@@ -12,22 +12,20 @@
 #include <QScrollArea>
 #include <QStandardPaths>
 #include <QJsonDocument>
-#include <QMessageBox>
 #include <QFileSystemModel>
 #include <QIODevice>
 #include <QLabel>
 
 #include "pages/configurationpage.h"
-#include "pages/generalpage.h"
-#include "pages/minecraftpage.h"
+#include "pages/gamepage.h"
+#include "pages/logspage.h"
 #include "launch/launcher.h"
 #include "buildconfig.h"
 #include "widgets/widgetutils.h"
 #include "util/fs.h"
-#include "util/utils.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::load()), offlineLauncher(config, false, NULL){
-    setWindowTitle(QStringLiteral("Lunar Client Qt v") + BuildConfig::VERSION);
+    setWindowTitle(QStringLiteral("ATW Client v") + BuildConfig::VERSION);
     static QString icon = FS::combinePaths(QCoreApplication::applicationDirPath(), QStringLiteral("icon.ico"));
     if (QFile::exists(icon))
         setWindowIcon(QIcon(icon));
@@ -63,12 +61,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
     pageList->setIconSize(QSize(32, 32));
 
     pages = {
-        new GeneralPage(config),
-        new MinecraftPage(config),
+        new GamePage(config),
         new AgentsPage(config),
         new ModsPage(config),
-        new HelpersPage(config)
+        new HelpersPage(config),
+        new LogsPage(config)
     };
+    logsPage = static_cast<LogsPage*>(pages.last());
 
     for(ConfigurationPage* page : pages){
         new QListWidgetItem(page->icon(), page->title(), pageList);
@@ -84,25 +83,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
     font.setPointSize(11);
     pageList->setFont(font);
 
-    versionSelect = new QComboBox();
-    versionSelect->addItems(Utils::getOrderedAvailableVersions());
-
-    modLoaderSelect = new QComboBox();
-    modLoaderSelect->addItems(Utils::getAvailableModLoaders(versionSelect->currentText()));
-    connect(versionSelect, &QComboBox::currentTextChanged, [&](const QString text) {modLoaderSelect->clear(); modLoaderSelect->addItems(Utils::getAvailableModLoaders(text));});
-
     launchButton = new QPushButton();
     launchButton->setMinimumHeight(80);
-    connect(launchButton, &QPushButton::clicked, this, &MainWindow::launch);
+    connect(launchButton, &QPushButton::clicked, this, &MainWindow::launchOrEndProcess);
 
     connect(&offlineLauncher, &OfflineLauncher::error, this, &MainWindow::errorCallback);
+    connect(&offlineLauncher, &OfflineLauncher::processStarted, this, &MainWindow::updateLaunchButtonState);
+    connect(&offlineLauncher, &OfflineLauncher::processFinished, this, &MainWindow::updateLaunchButtonState);
+
+    processCheckTimer = new QTimer(this);
+    connect(processCheckTimer, &QTimer::timeout, this, &MainWindow::updateLaunchButtonState);
+    processCheckTimer->start(1000);
 
     resetLaunchButtons();
 
     mainLayout->addWidget(pageList);
-    mainLayout->addWidget(versionSelect, 1, 0);
-    mainLayout->addWidget(modLoaderSelect, 2, 0);
-    mainLayout->addWidget(launchButton, 4, 0);
+    mainLayout->addWidget(launchButton, 2, 0);
 
 
     QFrame *frame = new QFrame;
@@ -133,8 +129,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
 
 
     connect(pageList, &QListWidget::currentRowChanged, [this, title, description](int current) {
-        title->setText(pages[current]->title());
-        description->setText(pages[current]->description());
+        if (current >= 0 && current < pages.size()) {
+            title->setText(pages[current]->title());
+            description->setText(pages[current]->description());
+        }
     });
 
     pageList->setCurrentRow(0);
@@ -158,16 +156,35 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), config(Config::lo
 }
 
 void MainWindow::resetLaunchButtons() {
-    launchButton->setEnabled(true);
-    launchButton->setText(QStringLiteral("Launch"));
+    updateLaunchButtonState();
 }
 
+void MainWindow::updateLaunchButtonState() {
+    if (offlineLauncher.isProcessRunning()) {
+        launchButton->setText(QStringLiteral("End Process"));
+        launchButton->setEnabled(true);
+    } else {
+        launchButton->setText(QStringLiteral("Launch"));
+        launchButton->setEnabled(true);
+    }
+}
 
-void MainWindow::launch(){
+void MainWindow::launchOrEndProcess() {
+    if (offlineLauncher.isProcessRunning()) {
+        offlineLauncher.endProcess();
+        if (logsPage)
+            logsPage->stopPolling();
+        return;
+    }
     apply();
-    offlineLauncher.launch();
-    if(config.closeOnLaunch)
-        close();
+    if (offlineLauncher.launch()) {
+        if (logsPage) {
+            logsPage->startPolling();
+            pageList->setCurrentRow(pages.indexOf(logsPage));
+        }
+        if (config.closeOnLaunch)
+            close();
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -180,43 +197,34 @@ void MainWindow::apply() {
     for(ConfigurationPage *page : pages) {
         page->apply();
     }
-    config.gameVersion = versionSelect->currentText();
-    config.modLoader = modLoaderSelect->currentText();
+    config.gameVersion = QStringLiteral("1.8.9");
+    config.modLoader = QStringLiteral("Optifine");
 }
 
 void MainWindow::load() {
     for(ConfigurationPage* page : pages){
         page->load();
     }
-    versionSelect->setCurrentText(config.gameVersion);
-    modLoaderSelect->setCurrentText(config.modLoader);
 }
 
 
 void MainWindow::errorCallback(const QString &message) {
-    QMessageBox messageBox;
-    messageBox.setText(message);
-    messageBox.exec();
+    statusBar()->showMessage(message, 10000);
+    if (logsPage) {
+        logsPage->stopPolling();
+        pageList->setCurrentRow(pages.indexOf(logsPage));
+        logsPage->appendToMainLog(QStringLiteral("[Launcher Error] ") + message);
+    }
 }
 
 #ifdef INCLUDE_UPDATER
 
 void MainWindow::updateAvailable(const QString &url) {
-    QMessageBox messageBox;
-    messageBox.setWindowTitle("Update available!");
-    messageBox.setText(QString(
-            "A new update is available!<br>"
-            "To update LC-Qt, follow the link below:<br>"
-            "<a href='%1'>%1</a>"
-    ).arg(url));
-    messageBox.exec();
+    statusBar()->showMessage(QStringLiteral("Update available: ") + url, 15000);
 }
 
 void MainWindow::noUpdatesAvailable() {
-    QMessageBox messageBox;
-    messageBox.setWindowTitle("No updates available!");
-    messageBox.setText("No updates available!");
-    messageBox.exec();
+    statusBar()->showMessage(QStringLiteral("No updates available."), 3000);
 }
 
 #endif

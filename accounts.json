@@ -1,0 +1,24 @@
+{
+    "accounts": {
+      "7f1e18b533f04bddb3fd2c2477f57cc2": {
+        "accessToken": "eyJraWQiOiIwNDkxODEiLCJhbGciOiJSUzI1NiJ9.eyJ4dWlkIjoiMjUzNTQ3MTA2MzEyNTQ1NSIsImFnZyI6IkFkdWx0Iiwic3ViIjoiOGU4ODE2ODYtNGUwMS00MWRiLWE1YTQtOGFmNjFiNzdhMDAzIiwiYXV0aCI6IlhCT1giLCJucyI6ImRlZmF1bHQiLCJyb2xlcyI6W10sImlzcyI6ImF1dGhlbnRpY2F0aW9uIiwiZmxhZ3MiOlsib3JkZXJzXzIwMjIiLCJtc2FtaWdyYXRpb25fc3RhZ2U0IiwidHdvZmFjdG9yYXV0aCIsIm11bHRpcGxheWVyIl0sInByb2ZpbGVzIjp7Im1jIjoiYjAwMTQ1MTUtZjA3MC00MmE5LThiNTctZGZjM2RiMTUyY2ViIn0sInBsYXRmb3JtIjoiUENfTEFVTkNIRVIiLCJwZmQiOlt7InR5cGUiOiJtYyIsImlkIjoiYjAwMTQ1MTUtZjA3MC00MmE5LThiNTctZGZjM2RiMTUyY2ViIiwibmFtZSI6IkNhcHRhaW5BVFcifV0sIm5iZiI6MTc3MjE1MjI1MSwiZXhwIjoxNzcyMjM4NjUxLCJpYXQiOjE3NzIxNTIyNTEsImFpZCI6IjAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDA0MDJiNTMyOCJ9.XKlTEkMltb75RMp4_10DeUYe-YPKjf3XidLtdfZldBMGonE6NEir3QcJMQl71i-KdeRWC3GmmAZAeAjFzP8u2b7mHKyhynLISxOKs85kX6qE5HsxFX88JnIXqe-rmjQuCepzgPMFxqLhFh8SrerfyCLetQydVZw3Plp9l9sSLAvuSq56UOiZLiN3ztf7DyFmV5flL32gOx1AZoQsz1R9rbLEqrYBwh4KSXsCdlI_OxEhvDrCpQCYy2ejtUgt3R9774YscNTRFxQxsLeJ6BwBqLggOb9YQkTB1Pxt9Ev1xtssqVJLEm1DqnfoUpZCRlkjrVd-7sun4BD1bvOr4engOw",
+        "accessTokenExpiresAt": "2026-02-28T00:31:02.350Z",
+        "localId": "7f1e18b533f04bddb3fd2c2477f57cc2",
+        "refreshToken": "M.C522_BL2.0.U.-Ci7Dar5DJiMTWBelL8vGhPziIaLmy!K!lya4iA2PIrmCGzVswPdTrUWQ0pjT1ZFV3k6PpaRXLxY2x22bz6mMC!gTCcasV1LUquhetFfRtQ6xVZn1nqkXvqQca019ZFmkVoLvE9CDjUzS0*XS4pMCy4mp75Z4vgq1BV79TlSDIvOPiEZwGvLBdzfoPyJrm2lgrwgt6dYUoGJbpu0G4wxZtF9bCgLKzxnHajaZqvKePaWxKdACg*hzqnyM0NQcsQDiP3ieE6GiOYQO!xkTDN6M0JXtPrnvsKmXP4G4zITB048SP!OTH1h9zlojlE16GDS2aEaHdCiQfxWoSU3vw*9OXkVtFlo7BEj5rvUL3db52bH9",
+        "minecraftProfile": {
+          "id": "b0014515f07042a98b57dfc3db152ceb",
+          "name": "CaptainATW"
+        },
+        "remoteId": "2535471063125455",
+        "type": "Xbox",
+        "username": "CaptainATW",
+        "eligibleForMigration": false,
+        "hasMultipleProfiles": false,
+        "legacy": false,
+        "persistent": true,
+        "userProperties": []
+      }
+    },
+    "mojangClientToken": "d16301477cfe4f419c0cf25b13d417d8",
+    "activeAccountLocalId": "7f1e18b533f04bddb3fd2c2477f57cc2"
+  }

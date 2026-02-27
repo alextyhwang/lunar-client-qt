@@ -1,11 +1,11 @@
 ---
 name: lunar-client-qt
-description: Domain knowledge for the lunar-client-qt launcher. Use when working on this repository, modifying launch behavior, account handling, or integrating with Lunar Client.
+description: Domain knowledge for the ATW Client launcher (lunar-client-qt fork). Use when working on this repository, modifying launch behavior, account handling, or integrating with Lunar Client.
 ---
 
-# Lunar Client Qt
+# ATW Client
 
-C++/Qt launcher that bypasses the official Lunar Client launcher and starts Genesis directly.
+C++/Qt launcher that bypasses the official Lunar Client launcher and starts Genesis directly. Rebranded as ATW Client.
 
 ## Key Paths
 
@@ -40,3 +40,7 @@ Required args: `--version`, `--accessToken`, `--assetIndex`, `--userProperties`,
 - Launch logic: `src/launch/offlinelauncher.cpp`
 - Path helpers: `src/util/fs.cpp`
 - Config load/save: `src/config/config.cpp`
+
+## Workflow
+
+**Rebuild the project after every turn** when making code changes. Run from the build directory: `cmake --build .` or `mingw32-make`.

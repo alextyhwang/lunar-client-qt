@@ -7,14 +7,14 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    QApplication::setApplicationName(QStringLiteral("lunar-client-qt"));
+    QApplication::setApplicationName(QStringLiteral("atw-client"));
 
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();  
 
     QCommandLineOption noGuiOption("nogui",
-        QCoreApplication::translate("main", "Launch Lunar Client Qt without GUI. Enables the use of overriding options"));
+        QCoreApplication::translate("main", "Launch ATW Client without GUI. Enables the use of overriding options"));
     parser.addOption(noGuiOption);
 
     QCommandLineOption versionOption("gameVersion",
@@ -41,9 +41,15 @@ int main(int argc, char *argv[]) {
 
     if (parser.isSet(noGuiOption)) {
         Config config = Config::load();
-        parser.isSet(versionOption) ? config.gameVersion = parser.value(versionOption) : config.gameVersion;
-        parser.isSet(xmsOption) ? config.initialMemory = parser.value(xmsOption).toInt() : config.initialMemory;
-        parser.isSet(xmxOption) ? config.maximumMemory = parser.value(xmxOption).toInt() : config.maximumMemory;
+        config.gameVersion = QStringLiteral("1.8.9");
+        config.modLoader = QStringLiteral("Optifine");
+        config.keepMemorySame = true;
+        if (parser.isSet(xmsOption))
+            config.initialMemory = parser.value(xmsOption).toInt();
+        if (parser.isSet(xmxOption))
+            config.maximumMemory = parser.value(xmxOption).toInt();
+        if (config.keepMemorySame)
+            config.initialMemory = config.maximumMemory;
         OfflineLauncher(config, parser.isSet(assetIndexOption), parser.value(assetIndexOption), nullptr).launch();
         return 1;
     }

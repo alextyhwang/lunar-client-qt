@@ -65,18 +65,84 @@ static void loadActiveAccount(QString& accessToken, QString& username, QString& 
         userProperties = "{}";
 }
 
+bool OfflineLauncher::isProcessRunning() const {
+    if (process && process->state() != QProcess::NotRunning)
+        return true;
+    if (launchedPid != 0 && isPidRunning(launchedPid))
+        return true;
+    return false;
+}
+
+void OfflineLauncher::endProcess() {
+    if (process && process->state() != QProcess::NotRunning) {
+        process->terminate();
+        process->waitForFinished(3000);
+        if (process->state() != QProcess::NotRunning)
+            process->kill();
+        return;
+    }
+    if (launchedPid != 0) {
+#ifdef Q_OS_WIN
+        QProcess killProc;
+        killProc.setProgram(QStringLiteral("taskkill"));
+        killProc.setArguments({QStringLiteral("/PID"), QString::number(launchedPid), QStringLiteral("/F")});
+        killProc.start();
+        killProc.waitForFinished(3000);
+#else
+        QProcess killProc;
+        killProc.setProgram(QStringLiteral("kill"));
+        killProc.setArguments({QStringLiteral("-9"), QString::number(launchedPid)});
+        killProc.start();
+        killProc.waitForFinished(3000);
+#endif
+        launchedPid = 0;
+    }
+    emit processFinished();
+}
+
+void OfflineLauncher::onProcessFinished(int, QProcess::ExitStatus) {
+    launchedPid = 0;
+    if (process) {
+        process->deleteLater();
+        process = nullptr;
+    }
+    emit processFinished();
+}
+
+bool OfflineLauncher::isPidRunning(qint64 pid) {
+#ifdef Q_OS_WIN
+    QProcess checkProc;
+    checkProc.setProgram(QStringLiteral("cmd"));
+    checkProc.setArguments({QStringLiteral("/c"), QStringLiteral("tasklist"), QStringLiteral("/FI"),
+                           QStringLiteral("PID eq ") + QString::number(pid)});
+    checkProc.start();
+    checkProc.waitForFinished(2000);
+    QString output = QString::fromLocal8Bit(checkProc.readAllStandardOutput());
+    return !output.contains(QStringLiteral("INFO: No tasks"));
+#else
+    QProcess checkProc;
+    checkProc.setProgram(QStringLiteral("kill"));
+    checkProc.setArguments({QStringLiteral("-0"), QString::number(pid)});
+    checkProc.start();
+    checkProc.waitForFinished(1000);
+    return checkProc.exitCode() == 0;
+#endif
+}
+
 bool OfflineLauncher::launch() {
     if (config.gameVersion.isEmpty()) {
         emit error("No version selected!\nDo you have lunar installed?");
         return false;
     }
+    if (isProcessRunning()) {
+        emit error("Game is already running.");
+        return false;
+    }
 
-    QProcess process;
-    process.setProgram(config.useCustomJre ? config.customJrePath : findJavaExecutable());
-
-    process.setStandardInputFile(QProcess::nullDevice());
-    process.setStandardOutputFile(QProcess::nullDevice());
-    process.setStandardErrorFile(QProcess::nullDevice());
+    process = new QProcess(qApp);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &OfflineLauncher::onProcessFinished);
+    process->setProgram(config.useCustomJre ? config.customJrePath : findJavaExecutable());
+    process->setStandardInputFile(QProcess::nullDevice());
 
     QString workingDir = FS::combinePaths(
         FS::getLunarDirectory(),
@@ -84,7 +150,7 @@ bool OfflineLauncher::launch() {
         "multiver"
     );
 
-    process.setWorkingDirectory(workingDir);
+    process->setWorkingDirectory(workingDir);
 
     QStringList workingDirFiles = QDir(workingDir).entryList(QDir::Files, QDir::Time | QDir::Reversed);
 
@@ -158,7 +224,7 @@ bool OfflineLauncher::launch() {
     if(config.joinServerOnLaunch)
         args << "--server" << config.serverIp;
 
-    process.setArguments(args);
+    process->setArguments(args);
 
     //Removes the windir environment variable, preventing lunar from reading your hosts file and executing tasklist on windows
 
@@ -173,14 +239,29 @@ bool OfflineLauncher::launch() {
     env.remove("JDK_JAVA_OPTIONS");
     env.remove("_JDK_JAVA_OPTIONS");
 
-    process.setProcessEnvironment(env);
-    process.setStandardOutputFile(FS::combinePaths(FS::getLunarDirectory(), "logs", "launcher", "renderer.log"), QIODevice::Truncate);
-    process.setStandardErrorFile(FS::combinePaths(FS::getLunarDirectory(), "logs", "launcher", "main.log"), QIODevice::Truncate);
+    process->setProcessEnvironment(env);
 
-    if(!process.startDetached()){
-        emit error("Failed to start process: " + process.errorString());
+    QString logsDir = FS::getLunarLogsPath();
+    QDir().mkpath(logsDir);
+    process->setStandardOutputFile(FS::combinePaths(logsDir, "renderer.log"), QIODevice::Truncate);
+    process->setStandardErrorFile(FS::combinePaths(logsDir, "main.log"), QIODevice::Truncate);
+
+#ifdef Q_OS_WIN
+    process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args) {
+        args->flags |= 0x00000008; // DETACHED_PROCESS - game continues when launcher closes
+    });
+#endif
+
+    process->start();
+    if (!process->waitForStarted(5000)) {
+        emit error("Failed to start process: " + process->errorString());
+        process->deleteLater();
+        process = nullptr;
         return false;
     }
+
+    launchedPid = process->processId();
+    emit processStarted();
 
     if (!config.helpers.isEmpty())
     {

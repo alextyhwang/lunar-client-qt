@@ -13,7 +13,7 @@
 #include <QFile>
 #include <QJsonDocument>
 
-const QString Config::configFilePath = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/lunar-client-qt/settings.json";
+const QString Config::configFilePath = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/atw-client/settings.json";
 
 void Config::save() {
     QJsonObject saveObj;
@@ -112,7 +112,7 @@ Config Config::load() {
     }
 
     return {
-        jsonObj["version"].toString("1.8"),
+        jsonObj["version"].toString("1.8.9"),
         jsonObj["modLoader"].toString("Optifine"),
         jsonObj["keepMemorySame"].toBool(true),
         jsonObj["initialMemory"].toInt(3072),

@@ -162,5 +162,5 @@ QStringList HelpersPage::getHelpers() {
 }
 
 QString HelpersPage::description() {
-    return "List of helpers you want to use. These are executables such as overlays or programs used alongside Lunar Client.";
+    return "List of helpers you want to use. These are executables such as overlays or programs used alongside the game.";
 }
