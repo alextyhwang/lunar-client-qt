@@ -12,8 +12,33 @@
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
+#include <QApplication>
 
-const QString Config::configFilePath = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/atw-client/settings.json";
+static QString resolvePortablePath(const QString& path) {
+#ifdef ATW_TEST_PORTABLE
+    if (path.isEmpty() || QDir::isAbsolutePath(path))
+        return path;
+
+    return QDir(QApplication::applicationDirPath()).filePath(path);
+#else
+    return path;
+#endif
+}
+
+static QString storePortablePath(const QString& path) {
+#ifdef ATW_TEST_PORTABLE
+    if (path.isEmpty() || !QDir::isAbsolutePath(path))
+        return path;
+
+    QDir appDir(QApplication::applicationDirPath());
+    const QString relativePath = appDir.relativeFilePath(path);
+    if (!relativePath.startsWith("..") && !QDir::isAbsolutePath(relativePath))
+        return QDir::toNativeSeparators(relativePath);
+#endif
+
+    return path;
+}
+
 static const QString defaultJvmArgs = QStringLiteral(
     "-Xverify:none "
     "-Xss2M "
@@ -50,7 +75,7 @@ void Config::save() {
     saveObj["maxMemory"] = maximumMemory;
 
     saveObj["useCustomJre"] = useCustomJre;
-    saveObj["customJrePath"] = customJrePath;
+    saveObj["customJrePath"] = storePortablePath(customJrePath);
 
     saveObj["closeOnLaunch"] = closeOnLaunch;
     saveObj["autoLaunchOnOpen"] = autoLaunchOnOpen;
@@ -58,7 +83,7 @@ void Config::save() {
     saveObj["jvmArgs"] = jvmArgs;
 
     saveObj["useCustomMinecraftDir"] = useCustomMinecraftDir;
-    saveObj["customMinecraftDir"] = customMinecraftDir;
+    saveObj["customMinecraftDir"] = storePortablePath(customMinecraftDir);
 
     saveObj["joinServerOnLaunch"] = joinServerOnLaunch;
     saveObj["serverIp"] = serverIp;
@@ -71,7 +96,7 @@ void Config::save() {
     QJsonArray arr;
     for(const Agent& agent : agents){
         QJsonObject agentObj;
-        agentObj["path"] = agent.path;
+        agentObj["path"] = storePortablePath(agent.path);
         agentObj["option"] = agent.option;
         agentObj["enabled"] = agent.enabled;
 
@@ -82,7 +107,7 @@ void Config::save() {
 
     QJsonArray arr2;
     foreach(const QString& str, helpers) {
-        arr2.append(str);
+        arr2.append(storePortablePath(str));
     }
 
     saveObj["helpers"] = arr2;
@@ -100,7 +125,7 @@ Config Config::load() {
         if(val.isObject()){
             QJsonObject obj = val.toObject();
 
-            QString path = obj["path"].toString();
+            QString path = resolvePortablePath(obj["path"].toString());
             QString option = obj["option"].toString({});
             bool enabled = obj["enabled"].toBool(true);
 
@@ -108,7 +133,7 @@ Config Config::load() {
                 agents.append({path, option, enabled});
             }
         }else{
-            QString path = val.toString();
+            QString path = resolvePortablePath(val.toString());
             agents.append({path, {}});
         }
     }
@@ -119,7 +144,7 @@ Config Config::load() {
     QStringList helpers;
 
     foreach(const QJsonValue& val, arr) {
-        QString path = val.toString();
+        QString path = resolvePortablePath(val.toString());
         if (QFile::exists(path)) {
             helpers.append(path);
         }
@@ -147,12 +172,12 @@ Config Config::load() {
         jsonObj["initialMemory"].toInt(3072),
         jsonObj["maxMemory"].toInt(3072),
         jsonObj["useCustomJre"].toBool(false),
-        jsonObj["customJrePath"].toString(),
+        resolvePortablePath(jsonObj["customJrePath"].toString()),
         jvmArgs,
         jsonObj["closeOnLaunch"].toBool(false),
         jsonObj["autoLaunchOnOpen"].toBool(true),
         jsonObj["useCustomMinecraftDir"].toBool(false),
-        jsonObj["customMinecraftDir"].toString(),
+        resolvePortablePath(jsonObj["customMinecraftDir"].toString()),
         jsonObj["joinServerOnLaunch"].toBool(false),
         jsonObj["serverIp"].toString(),
         jsonObj["windowWidth"].toInt(640),
@@ -165,13 +190,14 @@ Config Config::load() {
 }
 
 void Config::saveJsonToConfig(const QJsonObject &jsonObject) {
-    QString path = QFileInfo(configFilePath).absolutePath();
+    const QString filePath = configFilePath();
+    QString path = QFileInfo(filePath).absolutePath();
     QDir dir;
     if(!dir.exists(path)){
-        dir.mkdir(path);
+        dir.mkpath(path);
     }
 
-    QFile configFile(configFilePath);
+    QFile configFile(filePath);
 
     configFile.open(QIODevice::WriteOnly);
 
@@ -181,7 +207,7 @@ void Config::saveJsonToConfig(const QJsonObject &jsonObject) {
 }
 
 QJsonObject Config::loadJsonFromConfig() {
-    QFile configFile(configFilePath);
+    QFile configFile(configFilePath());
     configFile.open(QIODevice::ReadOnly | QIODevice::Text);
 
     QJsonObject jsonObj = QJsonDocument::fromJson(configFile.readAll()).object();
@@ -189,4 +215,12 @@ QJsonObject Config::loadJsonFromConfig() {
     configFile.close();
 
     return jsonObj;
+}
+
+QString Config::configFilePath() {
+#ifdef ATW_TEST_PORTABLE
+    return FS::combinePaths(QApplication::applicationDirPath(), QStringLiteral("config"), QStringLiteral("settings.json"));
+#else
+    return QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + QStringLiteral("/atw-client/settings.json");
+#endif
 }

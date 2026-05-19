@@ -145,11 +145,14 @@ find_package(${QT_VER} COMPONENTS ${QT_COMPONENTS} REQUIRED)
 # ----------------------------- Executable --------------------------------------
 
 add_executable(atw-client WIN32 MACOSX_BUNDLE ${SOURCE_FILES} ${VERSION_FILE} res.qrc)
+add_executable(atw-test-exe WIN32 MACOSX_BUNDLE ${SOURCE_FILES} ${VERSION_FILE} res.qrc)
+target_compile_definitions(atw-test-exe PRIVATE ATW_TEST_PORTABLE)
 
 # ----------------------------- Compile Definitions --------------------------------
 
 if(INCLUDE_UPDATER)
     target_compile_definitions(atw-client PRIVATE INCLUDE_UPDATER)
+    target_compile_definitions(atw-test-exe PRIVATE INCLUDE_UPDATER)
 endif()
 
 # ------------------------- Copy java agents and libraries -----------------------
@@ -178,6 +181,7 @@ copy_jars(libs ${LIBS_DEST_DIR} COPIED_LIBRARIES)
 
 add_custom_target(CopyJars ALL DEPENDS ${COPIED_AGENTS} ${COPIED_LIBRARIES})
 add_dependencies(atw-client CopyJars)
+add_dependencies(atw-test-exe CopyJars)
 
 # ----------------------- Copy application icon ------------------------------
 
@@ -187,6 +191,7 @@ configure_file(${CMAKE_SOURCE_DIR}/res/minecraft.ico ${CMAKE_BINARY_DIR}/minecra
 # Embed icon in Windows executable (for taskbar pin, Explorer, etc.)
 if(WIN32)
     target_sources(atw-client PRIVATE ${CMAKE_SOURCE_DIR}/res/atw-client.rc)
+    target_sources(atw-test-exe PRIVATE ${CMAKE_SOURCE_DIR}/res/atw-client.rc)
 endif()
 
 # ----------------------- Link against libraries ------------------------------
@@ -194,10 +199,12 @@ endif()
 list(TRANSFORM QT_COMPONENTS PREPEND ${QT_VER}:: OUTPUT_VARIABLE QT_LIBS)
 
 target_link_libraries(atw-client ${QT_LIBS})
+target_link_libraries(atw-test-exe ${QT_LIBS})
 
 # ---------------------- Set include directory ---------------------------
 
 target_include_directories(atw-client PRIVATE src)
+target_include_directories(atw-test-exe PRIVATE src)
 
 # ---------------------- Deploy Qt DLLs (Windows) ---------------------------
 
@@ -207,10 +214,18 @@ if(WIN32 AND QT_VER STREQUAL "Qt6")
         COMMAND "${QT_BIN_DIR}/windeployqt.exe" --no-translations "$<TARGET_FILE:atw-client>"
         COMMENT "Deploying Qt DLLs with windeployqt..."
     )
+    add_custom_command(TARGET atw-test-exe POST_BUILD
+        COMMAND "${QT_BIN_DIR}/windeployqt.exe" --no-translations "$<TARGET_FILE:atw-test-exe>"
+        COMMENT "Deploying Qt DLLs for atw-test-exe with windeployqt..."
+    )
 elseif(WIN32 AND QT_VER STREQUAL "Qt5")
     get_filename_component(QT_BIN_DIR "${Qt5_DIR}/../../../bin" ABSOLUTE)
     add_custom_command(TARGET atw-client POST_BUILD
         COMMAND "${QT_BIN_DIR}/windeployqt.exe" --no-translations "$<TARGET_FILE:atw-client>"
         COMMENT "Deploying Qt DLLs with windeployqt..."
+    )
+    add_custom_command(TARGET atw-test-exe POST_BUILD
+        COMMAND "${QT_BIN_DIR}/windeployqt.exe" --no-translations "$<TARGET_FILE:atw-test-exe>"
+        COMMENT "Deploying Qt DLLs for atw-test-exe with windeployqt..."
     )
 endif()

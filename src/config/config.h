@@ -74,11 +74,11 @@ public:
 private:
     static void saveJsonToConfig(const QJsonObject& jsonObject);
     static QJsonObject loadJsonFromConfig();
+    static QString configFilePath();
 
 
     Config() = default;
 
-    static const QString configFilePath;
 };
 
 

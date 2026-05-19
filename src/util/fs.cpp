@@ -32,7 +32,11 @@ QString FS::getAgentsDirectory() {
 }
 
 QString FS::getLunarDirectory() {
+#ifdef ATW_TEST_PORTABLE
+    return combinePaths(QApplication::applicationDirPath(), "data", "lunarclient");
+#else
     return combinePaths(QDir::homePath(), ".lunarclient");
+#endif
 }
 
 QString FS::getLunarAccountsPath() {
@@ -44,6 +48,9 @@ QString FS::getLunarLogsPath() {
 }
 
 QString FS::getMinecraftDirectory() {
+#ifdef ATW_TEST_PORTABLE
+    return combinePaths(QApplication::applicationDirPath(), "data", "minecraft");
+#else
     return combinePaths(
             QDir::homePath(),
 
@@ -55,8 +62,13 @@ QString FS::getMinecraftDirectory() {
             ".minecraft"
 #endif
     );
+#endif
 }
 
 QString FS::getWeaveModsDirectory() {
+#ifdef ATW_TEST_PORTABLE
+    return combinePaths(QApplication::applicationDirPath(), "data", "weave", "mods");
+#else
     return combinePaths(QDir::homePath(), ".weave/mods");
+#endif
 }
