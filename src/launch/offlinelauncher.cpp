@@ -109,6 +109,13 @@ void OfflineLauncher::endProcess() {
 }
 
 void OfflineLauncher::onProcessFinished(int, QProcess::ExitStatus) {
+    QString logsDir = FS::getLunarLogsPath();
+    QDir().mkpath(logsDir);
+    QFile logFile(FS::combinePaths(logsDir, QStringLiteral("main.log")));
+    if (logFile.open(QIODevice::Append | QIODevice::Text)) {
+        logFile.write(QStringLiteral("[Launcher] Java process exited with code %1\n").arg(process ? process->exitCode() : 0).toUtf8());
+    }
+
     launchedPid = 0;
     if (process) {
         process->deleteLater();
@@ -215,13 +222,16 @@ bool OfflineLauncher::launch() {
         userProperties = "{}";
     }
 
+    QString gameDir = config.useCustomMinecraftDir ? config.customMinecraftDir : FS::getMinecraftDirectory();
+    sanitizeMinecraftOptions(gameDir);
+
     QStringList genesisArgs{
             "com.moonsworth.lunar.genesis.Genesis",
             "--version", Utils::getGameVersion(config.gameVersion),
             "--accessToken", accessToken,
             "--assetIndex", useCustomAssetIndex ? customAssetIndex : Utils::getAssetsIndex(config.gameVersion),
             "--userProperties", userProperties,
-            "--gameDir", config.useCustomMinecraftDir ? config.customMinecraftDir : FS::getMinecraftDirectory(),
+            "--gameDir", gameDir,
             "--launcherVersion", "3.1.3",
             "--width", QString::number(config.windowWidth),
             "--height", QString::number(config.windowHeight),
@@ -381,6 +391,31 @@ QString OfflineLauncher::resolveJavaExecutable(const QString& path) {
     }
 
     return {};
+}
+
+void OfflineLauncher::sanitizeMinecraftOptions(const QString& gameDir) {
+    QString optionsPath = FS::combinePaths(gameDir, QStringLiteral("options.txt"));
+    QFile optionsFile(optionsPath);
+    if (!optionsFile.exists() || !optionsFile.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+
+    QList<QByteArray> lines = optionsFile.readAll().split('\n');
+    optionsFile.close();
+
+    bool changed = false;
+    for (QByteArray& line : lines) {
+        QByteArray trimmed = line.trimmed();
+        if (trimmed == "streamPreferredServer:") {
+            line = "streamPreferredServer:default";
+            changed = true;
+        }
+    }
+
+    if (!changed || !optionsFile.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+        return;
+
+    optionsFile.write(lines.join('\n'));
+    optionsFile.close();
 }
 
 void OfflineLauncher::HelperLaunch(const QString& helper) {
