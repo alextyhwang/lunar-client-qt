@@ -95,6 +95,9 @@ if (Test-Path $settingsSource) {
         closeOnLaunch = $false
         autoLaunchOnOpen = $true
         jvmArgs = ""
+        javaOptimizationProfile = "stable-g1"
+        useLargePages = $false
+        showGpuReminder = $true
         useCustomMinecraftDir = $true
         customMinecraftDir = ""
         joinServerOnLaunch = $false
@@ -163,6 +166,10 @@ Set-JsonProperty $settings "customJrePath" "runtime\java\bin\java.exe"
 Set-JsonProperty $settings "useCustomMinecraftDir" $true
 Set-JsonProperty $settings "customMinecraftDir" "data\minecraft\lunarclient"
 Set-JsonProperty $settings "autoLaunchOnOpen" $true
+Set-JsonProperty $settings "jvmArgs" ""
+Set-JsonProperty $settings "javaOptimizationProfile" "stable-g1"
+Set-JsonProperty $settings "useLargePages" $false
+Set-JsonProperty $settings "showGpuReminder" $true
 Set-JsonProperty $settings "agents" $newAgents
 Set-JsonProperty $settings "helpers" $newHelpers
 

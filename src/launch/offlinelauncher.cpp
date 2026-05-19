@@ -17,6 +17,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QTimer>
+#include <QRegularExpression>
+#include <QHostInfo>
 
 #include "util/fs.h"
 #include "util/utils.h"
@@ -29,6 +31,185 @@
 #endif
 
 OfflineLauncher::OfflineLauncher(const Config& config, const bool useCustomAssetIndex, const QString& customAssetIndex, QObject *parent) : Launcher(config, useCustomAssetIndex, customAssetIndex, parent) {
+}
+
+struct JavaProbeResult {
+    int majorVersion = 0;
+    bool isGraalVm = false;
+    bool ok = false;
+    QString output;
+};
+
+static QStringList stableG1ProfileArgs() {
+    return {
+        QStringLiteral("-XX:+UnlockExperimentalVMOptions"),
+        QStringLiteral("-XX:+UseG1GC"),
+        QStringLiteral("-XX:MaxGCPauseMillis=40"),
+        QStringLiteral("-XX:+AlwaysActAsServerClassMachine"),
+        QStringLiteral("-XX:MaxTenuringThreshold=1"),
+        QStringLiteral("-XX:SurvivorRatio=32"),
+        QStringLiteral("-XX:G1HeapRegionSize=8M"),
+        QStringLiteral("-XX:G1MixedGCCountTarget=4"),
+        QStringLiteral("-XX:G1MixedGCLiveThresholdPercent=90"),
+        QStringLiteral("-XX:-UsePerfData"),
+        QStringLiteral("-XX:+PerfDisableSharedMem")
+    };
+}
+
+static QStringList graalExperimentalArgs() {
+    return {
+        QStringLiteral("-XX:+EnableJVMCIProduct"),
+        QStringLiteral("-XX:+EnableJVMCI"),
+        QStringLiteral("-XX:+UseJVMCICompiler"),
+        QStringLiteral("-XX:+EagerJVMCI"),
+        QStringLiteral("-Dgraal.TuneInlinerExploration=1")
+    };
+}
+
+static QStringList lowPauseProfileArgs() {
+    return {
+        QStringLiteral("-XX:+UseZGC"),
+        QStringLiteral("-XX:+ZGenerational")
+    };
+}
+
+static void appendLauncherLog(const QString& line) {
+    QString logsDir = FS::getLunarLogsPath();
+    QDir().mkpath(logsDir);
+    QFile logFile(FS::combinePaths(logsDir, QStringLiteral("main.log")));
+    if (logFile.open(QIODevice::Append | QIODevice::Text)) {
+        logFile.write((line + QStringLiteral("\n")).toUtf8());
+    }
+}
+
+static QString probeJavaExecutable(const QString& executable) {
+#ifdef Q_OS_WIN
+    QFileInfo info(executable);
+    QString java = FS::combinePaths(info.absolutePath(), QStringLiteral("java.exe"));
+    if (QFileInfo(java).isExecutable())
+        return java;
+#endif
+    return executable;
+}
+
+static JavaProbeResult probeJava(const QString& executable) {
+    JavaProbeResult result;
+    QProcess probe;
+    probe.setProgram(probeJavaExecutable(executable));
+    probe.setArguments({QStringLiteral("-version")});
+    probe.start();
+    if (!probe.waitForFinished(5000)) {
+        probe.kill();
+        probe.waitForFinished(1000);
+        result.output = QStringLiteral("Java version probe timed out.");
+        return result;
+    }
+
+    result.ok = probe.exitCode() == 0;
+    result.output = QString::fromLocal8Bit(probe.readAllStandardError() + probe.readAllStandardOutput());
+    result.isGraalVm = result.output.contains(QStringLiteral("GraalVM"), Qt::CaseInsensitive);
+
+    QRegularExpression versionRegex(QStringLiteral("version\\s+\"([0-9]+)(?:\\.([0-9]+))?"));
+    QRegularExpressionMatch match = versionRegex.match(result.output);
+    if (match.hasMatch()) {
+        int first = match.captured(1).toInt();
+        int second = match.captured(2).toInt();
+        result.majorVersion = first == 1 ? second : first;
+    }
+
+    return result;
+}
+
+static bool validateJavaFlags(const QString& executable, const QStringList& flags, QString* output) {
+    QProcess validator;
+    validator.setProgram(probeJavaExecutable(executable));
+    validator.setArguments(flags + QStringList{QStringLiteral("-version")});
+    validator.start();
+    if (!validator.waitForFinished(6000)) {
+        validator.kill();
+        validator.waitForFinished(1000);
+        if (output)
+            *output = QStringLiteral("Java flag validation timed out.");
+        return false;
+    }
+
+    if (output)
+        *output = QString::fromLocal8Bit(validator.readAllStandardError() + validator.readAllStandardOutput());
+
+    return validator.exitCode() == 0;
+}
+
+static QStringList buildProfileArgs(const Config& config, const QString& executable, const JavaProbeResult& probe) {
+    QString profile = config.javaOptimizationProfile.trimmed();
+    if (profile.isEmpty())
+        profile = QStringLiteral("stable-g1");
+
+    QStringList profileArgs = stableG1ProfileArgs();
+    if (profile == QStringLiteral("graal-experimental")) {
+        QStringList candidate = profileArgs + graalExperimentalArgs();
+        QString validationOutput;
+        if (probe.isGraalVm && validateJavaFlags(executable, candidate, &validationOutput)) {
+            appendLauncherLog(QStringLiteral("[Java Optimizer] Using GraalVM experimental profile."));
+            profileArgs = candidate;
+        } else {
+            appendLauncherLog(QStringLiteral("[Java Optimizer] GraalVM experimental profile unavailable; falling back to Stable G1."));
+            if (!validationOutput.trimmed().isEmpty())
+                appendLauncherLog(QStringLiteral("[Java Optimizer] Validation output: ") + validationOutput.trimmed().replace('\n', ' '));
+        }
+    } else if (profile == QStringLiteral("low-pause")) {
+        QStringList candidate = lowPauseProfileArgs();
+        QString validationOutput;
+        if (probe.majorVersion >= 21 && validateJavaFlags(executable, candidate, &validationOutput)) {
+            appendLauncherLog(QStringLiteral("[Java Optimizer] Using low-pause experimental profile."));
+            profileArgs = candidate;
+        } else {
+            appendLauncherLog(QStringLiteral("[Java Optimizer] Low-pause profile requires Java 21+ support; falling back to Stable G1."));
+            if (!validationOutput.trimmed().isEmpty())
+                appendLauncherLog(QStringLiteral("[Java Optimizer] Validation output: ") + validationOutput.trimmed().replace('\n', ' '));
+        }
+    } else {
+        appendLauncherLog(QStringLiteral("[Java Optimizer] Using Stable G1 profile."));
+    }
+
+    if (config.useLargePages) {
+        QStringList candidate = profileArgs + QStringList{QStringLiteral("-XX:+UseLargePages")};
+        QString validationOutput;
+        if (validateJavaFlags(executable, candidate, &validationOutput)) {
+            profileArgs << QStringLiteral("-XX:+UseLargePages");
+            appendLauncherLog(QStringLiteral("[Java Optimizer] Large Pages requested. Windows must grant Lock pages in memory or the JVM may warn/fall back."));
+        } else {
+            appendLauncherLog(QStringLiteral("[Java Optimizer] Large Pages rejected by Java validation; continuing without it."));
+            if (!validationOutput.trimmed().isEmpty())
+                appendLauncherLog(QStringLiteral("[Java Optimizer] Validation output: ") + validationOutput.trimmed().replace('\n', ' '));
+        }
+    }
+
+    return profileArgs;
+}
+
+static void logLatencyDiagnostics(const Config& config, const JavaProbeResult& probe) {
+    appendLauncherLog(QStringLiteral("[Latency] JVM flags can reduce stutter but do not directly lower server ping."));
+    appendLauncherLog(QStringLiteral("[Java Optimizer] Java major=%1 GraalVM=%2").arg(probe.majorVersion).arg(probe.isGraalVm ? QStringLiteral("true") : QStringLiteral("false")));
+
+    if (config.showGpuReminder)
+        appendLauncherLog(QStringLiteral("[Performance] Verify Windows graphics settings use the discrete GPU for javaw.exe if FPS or frame pacing is poor."));
+
+    if (!config.joinServerOnLaunch || config.serverIp.trimmed().isEmpty())
+        return;
+
+    QString host = config.serverIp.trimmed();
+    int colonIndex = host.indexOf(':');
+    if (colonIndex > 0)
+        host = host.left(colonIndex);
+
+    QElapsedTimer timer;
+    timer.start();
+    QHostInfo hostInfo = QHostInfo::fromName(host);
+    if (hostInfo.error() == QHostInfo::NoError) {
+        appendLauncherLog(QStringLiteral("[Latency] DNS lookup for %1 took %2 ms.").arg(host).arg(timer.elapsed()));
+    } else {
+        appendLauncherLog(QStringLiteral("[Latency] DNS lookup for %1 failed after %2 ms: %3").arg(host).arg(timer.elapsed()).arg(hostInfo.errorString()));
+    }
 }
 
 // Load active account from Lunar Client's accounts.json. Returns empty strings if not found.
@@ -165,6 +346,16 @@ bool OfflineLauncher::launch() {
         return false;
     }
 
+    QString logsDir = FS::getLunarLogsPath();
+    QDir().mkpath(logsDir);
+
+#ifdef ATW_TEST_PORTABLE
+    JavaProbeResult javaProbe = probeJava(executable);
+    if (!javaProbe.ok)
+        appendLauncherLog(QStringLiteral("[Java Optimizer] Java version probe failed: ") + javaProbe.output.trimmed().replace('\n', ' '));
+    logLatencyDiagnostics(config, javaProbe);
+#endif
+
     process->setProgram(executable);
     process->setStandardInputFile(QProcess::nullDevice());
 
@@ -212,7 +403,15 @@ bool OfflineLauncher::launch() {
     if(config.useWeave)
         args << Utils::getAgentFlags("WeaveLoader");
 
-    args << QProcess::splitCommand(sanitizeJvmArgs(config.jvmArgs));
+#ifdef ATW_TEST_PORTABLE
+    QStringList removedJvmArgs;
+    args << buildProfileArgs(config, executable, javaProbe);
+    args << sanitizeJvmArgs(QProcess::splitCommand(config.jvmArgs), &removedJvmArgs);
+    for (const QString& removedArg : removedJvmArgs)
+        appendLauncherLog(QStringLiteral("[Java Optimizer] Removed unsupported JVM arg: ") + removedArg);
+#else
+    args << sanitizeJvmArgs(QProcess::splitCommand(config.jvmArgs));
+#endif
 
     QString accessToken, username, uuid, userProperties;
     loadActiveAccount(accessToken, username, uuid, userProperties);
@@ -253,9 +452,6 @@ bool OfflineLauncher::launch() {
 
     process->setArguments(args);
 
-    QString logsDir = FS::getLunarLogsPath();
-    QDir().mkpath(logsDir);
-
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.remove("JAVA_OPTS");
     env.remove("_JAVA_OPTS");
@@ -269,7 +465,11 @@ bool OfflineLauncher::launch() {
     process->setProcessEnvironment(env);
 
     process->setStandardOutputFile(FS::combinePaths(logsDir, "renderer.log"), QIODevice::Truncate);
+#ifdef ATW_TEST_PORTABLE
+    process->setStandardErrorFile(FS::combinePaths(logsDir, "main.log"), QIODevice::Append);
+#else
     process->setStandardErrorFile(FS::combinePaths(logsDir, "main.log"), QIODevice::Truncate);
+#endif
 
 #ifdef Q_OS_WIN
     process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* args) {
@@ -388,22 +588,34 @@ QString OfflineLauncher::resolveJavaExecutable(const QString& path) {
     return {};
 }
 
-QString OfflineLauncher::sanitizeJvmArgs(const QString& jvmArgs) {
+QStringList OfflineLauncher::sanitizeJvmArgs(const QStringList& args, QStringList* removedArgs) {
     QStringList filteredArgs;
-    const QStringList args = QProcess::splitCommand(jvmArgs);
 
     for (const QString& arg : args) {
         if (arg == QStringLiteral("-XX:+UseG1GC") ||
             arg == QStringLiteral("-XX:+UnlockExperimentalVMOptions") ||
+            arg == QStringLiteral("-XX:+UseStringDeduplication") ||
+            arg == QStringLiteral("-XX:+AlwaysActAsServerClassMachine") ||
+            arg == QStringLiteral("-XX:-UsePerfData") ||
+            arg == QStringLiteral("-XX:+PerfDisableSharedMem") ||
+            arg == QStringLiteral("-Xverify:none") ||
+            arg.startsWith(QStringLiteral("-Xss")) ||
+            arg.startsWith(QStringLiteral("-Xmn")) ||
             arg.startsWith(QStringLiteral("-XX:MaxGCPauseMillis=")) ||
+            arg.startsWith(QStringLiteral("-XX:MaxTenuringThreshold=")) ||
+            arg.startsWith(QStringLiteral("-XX:SurvivorRatio=")) ||
             arg.startsWith(QStringLiteral("-XX:G1HeapRegionSize=")) ||
             arg.startsWith(QStringLiteral("-XX:G1MixedGCCountTarget=")) ||
             arg.startsWith(QStringLiteral("-XX:G1MixedGCLiveThresholdPercent="))) {
             filteredArgs << arg;
+        } else if (arg.startsWith(QStringLiteral("-D")) && !arg.startsWith(QStringLiteral("-Dgraal."))) {
+            filteredArgs << arg;
+        } else if (removedArgs) {
+            removedArgs->append(arg);
         }
     }
 
-    return filteredArgs.join(QChar(' '));
+    return filteredArgs;
 }
 
 void OfflineLauncher::sanitizeMinecraftOptions(const QString& gameDir) {

@@ -31,7 +31,7 @@ private slots:
 private:
     static QString resolveJavaExecutable(const QString& path);
     static QString findJavaExecutable(const QString& gameVersion);
-    static QString sanitizeJvmArgs(const QString& jvmArgs);
+    static QStringList sanitizeJvmArgs(const QStringList& args, QStringList* removedArgs = nullptr);
     static void sanitizeMinecraftOptions(const QString& gameDir);
     static void HelperLaunch(const QString& helper);
     static bool isPidRunning(qint64 pid);

@@ -50,6 +50,9 @@ public:
     QString customJrePath;
 
     QString jvmArgs;
+    QString javaOptimizationProfile;
+    bool useLargePages;
+    bool showGpuReminder;
 
     bool closeOnLaunch;
     bool autoLaunchOnOpen;

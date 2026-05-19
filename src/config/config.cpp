@@ -39,6 +39,9 @@ static QString storePortablePath(const QString& path) {
     return path;
 }
 
+#ifdef ATW_TEST_PORTABLE
+static const QString defaultJvmArgs = QString();
+#else
 static const QString defaultJvmArgs = QStringLiteral(
     "-Xverify:none "
     "-Xss2M "
@@ -63,6 +66,7 @@ static const QString defaultJvmArgs = QStringLiteral(
     "-XX:+UseJVMCICompiler "
     "-XX:+EagerJVMCI"
 );
+#endif
 
 void Config::save() {
     QJsonObject saveObj;
@@ -81,6 +85,9 @@ void Config::save() {
     saveObj["autoLaunchOnOpen"] = autoLaunchOnOpen;
 
     saveObj["jvmArgs"] = jvmArgs;
+    saveObj["javaOptimizationProfile"] = javaOptimizationProfile;
+    saveObj["useLargePages"] = useLargePages;
+    saveObj["showGpuReminder"] = showGpuReminder;
 
     saveObj["useCustomMinecraftDir"] = useCustomMinecraftDir;
     saveObj["customMinecraftDir"] = storePortablePath(customMinecraftDir);
@@ -174,6 +181,9 @@ Config Config::load() {
         jsonObj["useCustomJre"].toBool(false),
         resolvePortablePath(jsonObj["customJrePath"].toString()),
         jvmArgs,
+        jsonObj["javaOptimizationProfile"].toString(QStringLiteral("stable-g1")),
+        jsonObj["useLargePages"].toBool(false),
+        jsonObj["showGpuReminder"].toBool(true),
         jsonObj["closeOnLaunch"].toBool(false),
         jsonObj["autoLaunchOnOpen"].toBool(true),
         jsonObj["useCustomMinecraftDir"].toBool(false),

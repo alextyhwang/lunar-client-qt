@@ -8,6 +8,7 @@
 #include <QSlider>
 #include <QPlainTextEdit>
 #include <QCheckBox>
+#include <QComboBox>
 
 #include "configurationpage.h"
 #include "gui/widgets/filechooser.h"
@@ -28,6 +29,11 @@ private:
     FileChooser* jrePath;
     FileChooser* minecraftPathChooser;
     QPushButton* openDataFolder;
+#ifdef ATW_TEST_PORTABLE
+    QComboBox* javaProfile;
+    QCheckBox* useLargePages;
+    QCheckBox* showGpuReminder;
+#endif
     QCheckBox* closeOnLaunch;
     QPlainTextEdit* jvmArgs;
 };

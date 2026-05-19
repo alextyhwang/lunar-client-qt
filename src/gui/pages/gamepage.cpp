@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QGroupBox>
 #include <QCheckBox>
+#include <QComboBox>
 
 #include "gui/widgets/filechooser.h"
 #include "gui/widgets/widgetutils.h"
@@ -80,6 +81,29 @@ GamePage::GamePage(Config& config, QWidget *parent) : ConfigurationPage(config, 
     minecraftPathChooser = new FileChooser(QFileDialog::Directory);
     minecraftContainer->addWidget(minecraftPathChooser);
 
+#ifdef ATW_TEST_PORTABLE
+    QVBoxLayout* profileContainer = new QVBoxLayout();
+    profileContainer->setSpacing(4);
+    profileContainer->addWidget(new QLabel(QStringLiteral("Java Profile")), 0, Qt::AlignLeft);
+    javaProfile = new QComboBox();
+    javaProfile->addItem(QStringLiteral("Stable G1, recommended"), QStringLiteral("stable-g1"));
+    javaProfile->addItem(QStringLiteral("GraalVM experimental"), QStringLiteral("graal-experimental"));
+    javaProfile->addItem(QStringLiteral("Low-pause experimental (Java 21+)"), QStringLiteral("low-pause"));
+    profileContainer->addWidget(javaProfile);
+
+    QHBoxLayout* largePagesLayout = new QHBoxLayout();
+    largePagesLayout->addWidget(new QLabel(QStringLiteral("Use Large Pages")));
+    useLargePages = new QCheckBox();
+    largePagesLayout->addStretch();
+    largePagesLayout->addWidget(useLargePages);
+
+    QHBoxLayout* gpuReminderLayout = new QHBoxLayout();
+    gpuReminderLayout->addWidget(new QLabel(QStringLiteral("Discrete GPU Reminder")));
+    showGpuReminder = new QCheckBox();
+    gpuReminderLayout->addStretch();
+    gpuReminderLayout->addWidget(showGpuReminder);
+#endif
+
     QVBoxLayout* jvmArgsGroup = new QVBoxLayout();
     jvmArgsGroup->setSpacing(4);
     jvmArgs = new QPlainTextEdit();
@@ -98,6 +122,11 @@ GamePage::GamePage(Config& config, QWidget *parent) : ConfigurationPage(config, 
     mainLayout->addLayout(memorySliderContainer);
     mainLayout->addLayout(minecraftContainer);
     mainLayout->addLayout(jreContainer);
+#ifdef ATW_TEST_PORTABLE
+    mainLayout->addLayout(profileContainer);
+    mainLayout->addLayout(largePagesLayout);
+    mainLayout->addLayout(gpuReminderLayout);
+#endif
     mainLayout->addLayout(jvmArgsGroup);
     mainLayout->addLayout(toggleLayout);
     mainLayout->addStretch(1); // Push everything to the top
@@ -128,6 +157,11 @@ void GamePage::apply() {
     config.customMinecraftDir = mcPath;
 
     config.jvmArgs = jvmArgs->toPlainText();
+#ifdef ATW_TEST_PORTABLE
+    config.javaOptimizationProfile = javaProfile->currentData().toString();
+    config.useLargePages = useLargePages->isChecked();
+    config.showGpuReminder = showGpuReminder->isChecked();
+#endif
     config.closeOnLaunch = !closeOnLaunch->isChecked();
 }
 
@@ -136,6 +170,12 @@ void GamePage::load() {
     jrePath->setPath(config.customJrePath);
     minecraftPathChooser->setPath(config.customMinecraftDir);
     jvmArgs->setPlainText(config.jvmArgs);
+#ifdef ATW_TEST_PORTABLE
+    int profileIndex = javaProfile->findData(config.javaOptimizationProfile);
+    javaProfile->setCurrentIndex(profileIndex >= 0 ? profileIndex : 0);
+    useLargePages->setChecked(config.useLargePages);
+    showGpuReminder->setChecked(config.showGpuReminder);
+#endif
     closeOnLaunch->setChecked(!config.closeOnLaunch);
 }
 
