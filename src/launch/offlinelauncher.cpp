@@ -243,6 +243,9 @@ bool OfflineLauncher::launch() {
 
     process->setArguments(args);
 
+    QString logsDir = FS::getLunarLogsPath();
+    QDir().mkpath(logsDir);
+
     //Removes the windir environment variable, preventing lunar from reading your hosts file and executing tasklist on windows
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
@@ -255,11 +258,11 @@ bool OfflineLauncher::launch() {
     env.remove("_JAVA_TOOL_OPTIONS");
     env.remove("JDK_JAVA_OPTIONS");
     env.remove("_JDK_JAVA_OPTIONS");
+    env.insert(QStringLiteral("ALSOFT_LOGLEVEL"), QStringLiteral("3"));
+    env.insert(QStringLiteral("ALSOFT_LOGFILE"), FS::combinePaths(logsDir, QStringLiteral("openal.log")));
 
     process->setProcessEnvironment(env);
 
-    QString logsDir = FS::getLunarLogsPath();
-    QDir().mkpath(logsDir);
     process->setStandardOutputFile(FS::combinePaths(logsDir, "renderer.log"), QIODevice::Truncate);
     process->setStandardErrorFile(FS::combinePaths(logsDir, "main.log"), QIODevice::Truncate);
 

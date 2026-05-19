@@ -3,9 +3,12 @@
 #include <QCommandLineParser>
 #include <QFontDatabase>
 #include <QFileInfo>
+#include <QFile>
+#include <QTextStream>
 
 #include "gui/mainwindow.h"
 #include "launch/offlinelauncher.h"
+#include "util/fs.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -96,8 +99,23 @@ int main(int argc, char *argv[]) {
             config.maximumMemory = parser.value(xmxOption).toInt();
         if (config.keepMemorySame)
             config.initialMemory = config.maximumMemory;
-        OfflineLauncher(config, parser.isSet(assetIndexOption), parser.value(assetIndexOption), nullptr).launch();
-        return 1;
+
+        OfflineLauncher launcher(config, parser.isSet(assetIndexOption), parser.value(assetIndexOption), &app);
+        QObject::connect(&launcher, &OfflineLauncher::error, [&app](const QString& message) {
+            QDir().mkpath(FS::getLunarLogsPath());
+            QFile logFile(FS::combinePaths(FS::getLunarLogsPath(), QStringLiteral("main.log")));
+            if (logFile.open(QIODevice::Append | QIODevice::Text)) {
+                QTextStream stream(&logFile);
+                stream << "[Launcher Error] " << message << Qt::endl;
+            }
+            app.quit();
+        });
+        QObject::connect(&launcher, &OfflineLauncher::processFinished, &app, &QApplication::quit);
+
+        if (!launcher.launch())
+            return 1;
+
+        return QApplication::exec();
     }
     else {
         MainWindow mainWindow;
