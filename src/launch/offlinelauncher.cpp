@@ -212,7 +212,7 @@ bool OfflineLauncher::launch() {
     if(config.useWeave)
         args << Utils::getAgentFlags("WeaveLoader");
 
-    args << QProcess::splitCommand(config.jvmArgs);
+    args << QProcess::splitCommand(sanitizeJvmArgs(config.jvmArgs));
 
     QString accessToken, username, uuid, userProperties;
     loadActiveAccount(accessToken, username, uuid, userProperties);
@@ -256,10 +256,7 @@ bool OfflineLauncher::launch() {
     QString logsDir = FS::getLunarLogsPath();
     QDir().mkpath(logsDir);
 
-    //Removes the windir environment variable, preventing lunar from reading your hosts file and executing tasklist on windows
-
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.remove("windir");
     env.remove("JAVA_OPTS");
     env.remove("_JAVA_OPTS");
     env.remove("JAVA_OPTIONS");
@@ -268,8 +265,6 @@ bool OfflineLauncher::launch() {
     env.remove("_JAVA_TOOL_OPTIONS");
     env.remove("JDK_JAVA_OPTIONS");
     env.remove("_JDK_JAVA_OPTIONS");
-    env.insert(QStringLiteral("ALSOFT_LOGLEVEL"), QStringLiteral("3"));
-    env.insert(QStringLiteral("ALSOFT_LOGFILE"), FS::combinePaths(logsDir, QStringLiteral("openal.log")));
 
     process->setProcessEnvironment(env);
 
@@ -391,6 +386,24 @@ QString OfflineLauncher::resolveJavaExecutable(const QString& path) {
     }
 
     return {};
+}
+
+QString OfflineLauncher::sanitizeJvmArgs(const QString& jvmArgs) {
+    QStringList filteredArgs;
+    const QStringList args = QProcess::splitCommand(jvmArgs);
+
+    for (const QString& arg : args) {
+        if (arg == QStringLiteral("-XX:+UseG1GC") ||
+            arg == QStringLiteral("-XX:+UnlockExperimentalVMOptions") ||
+            arg.startsWith(QStringLiteral("-XX:MaxGCPauseMillis=")) ||
+            arg.startsWith(QStringLiteral("-XX:G1HeapRegionSize=")) ||
+            arg.startsWith(QStringLiteral("-XX:G1MixedGCCountTarget=")) ||
+            arg.startsWith(QStringLiteral("-XX:G1MixedGCLiveThresholdPercent="))) {
+            filteredArgs << arg;
+        }
+    }
+
+    return filteredArgs.join(QChar(' '));
 }
 
 void OfflineLauncher::sanitizeMinecraftOptions(const QString& gameDir) {
