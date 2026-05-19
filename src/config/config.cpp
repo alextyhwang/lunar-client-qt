@@ -14,6 +14,30 @@
 #include <QJsonDocument>
 
 const QString Config::configFilePath = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/atw-client/settings.json";
+static const QString defaultJvmArgs = QStringLiteral(
+    "-Xverify:none "
+    "-Xss2M "
+    "-Xmn1G "
+    "-XX:+UnlockExperimentalVMOptions "
+    "-XX:+UseG1GC "
+    "-XX:MaxGCPauseMillis=40 "
+    "-XX:+AlwaysActAsServerClassMachine "
+    "-XX:MaxTenuringThreshold=1 "
+    "-XX:SurvivorRatio=32 "
+    "-XX:G1HeapRegionSize=8M "
+    "-XX:G1MixedGCCountTarget=4 "
+    "-XX:G1MixedGCLiveThresholdPercent=90 "
+    "-XX:-UsePerfData "
+    "-XX:+PerfDisableSharedMem "
+    "-XX:+UseLargePages "
+    "-XX:+AlwaysPreTouch "
+    "-XX:+UseFastStosb "
+    "-XX:+EliminateLocks "
+    "-XX:+EnableJVMCIProduct "
+    "-XX:+EnableJVMCI "
+    "-XX:+UseJVMCICompiler "
+    "-XX:+EagerJVMCI"
+);
 
 void Config::save() {
     QJsonObject saveObj;
@@ -29,6 +53,7 @@ void Config::save() {
     saveObj["customJrePath"] = customJrePath;
 
     saveObj["closeOnLaunch"] = closeOnLaunch;
+    saveObj["autoLaunchOnOpen"] = autoLaunchOnOpen;
 
     saveObj["jvmArgs"] = jvmArgs;
 
@@ -111,6 +136,10 @@ Config Config::load() {
         mods.append(Mod(file.fileName().remove(".jar.disabled").remove(".jar"), !file.completeSuffix().endsWith("jar.disabled")));
     }
 
+    QString jvmArgs = jsonObj["jvmArgs"].toString(defaultJvmArgs).trimmed();
+    if (jvmArgs.isEmpty())
+        jvmArgs = defaultJvmArgs;
+
     return {
         jsonObj["version"].toString("1.8.9"),
         jsonObj["modLoader"].toString("Optifine"),
@@ -119,8 +148,9 @@ Config Config::load() {
         jsonObj["maxMemory"].toInt(3072),
         jsonObj["useCustomJre"].toBool(false),
         jsonObj["customJrePath"].toString(),
-        jsonObj["jvmArgs"].toString(),
+        jvmArgs,
         jsonObj["closeOnLaunch"].toBool(false),
+        jsonObj["autoLaunchOnOpen"].toBool(true),
         jsonObj["useCustomMinecraftDir"].toBool(false),
         jsonObj["customMinecraftDir"].toString(),
         jsonObj["joinServerOnLaunch"].toBool(false),

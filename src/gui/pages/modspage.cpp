@@ -15,119 +15,197 @@
 #include <QUrl>
 
 ModsPage::ModsPage(Config& config, QWidget* parent) : ConfigurationPage(config, parent) {
-	QVBoxLayout* mainLayout = new QVBoxLayout();
-	mainLayout->setSpacing(20);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
+    mainLayout->setSpacing(12);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
 
-	useWeave = new QCheckBox(QStringLiteral("Enable Weave"));
-	mainLayout->addWidget(useWeave, 0, Qt::AlignCenter);
+    // --- Weave Mods Section ---
+    QHBoxLayout* weaveHeaderLayout = new QHBoxLayout();
+    QLabel* weaveLabel = new QLabel(QStringLiteral("Weave Mods"));
+    useWeave = new QCheckBox(QStringLiteral("Enable Weave"));
+    weaveHeaderLayout->addWidget(weaveLabel);
+    weaveHeaderLayout->addStretch();
+    weaveHeaderLayout->addWidget(useWeave);
 
-	mods = new ModsView(this);
-	mods->setModel((model = new ModsModel(config.mods, this)));
+    mods = new ModsView(this);
+    mods->setModel((modsModel = new ModsModel(config.mods, this)));
 
-		add = new QPushButton(QStringLiteral("Add"));
-		remove = new QPushButton(QStringLiteral("Remove"));
-		moveUp = new QPushButton(QStringLiteral("Move Up"));
-		moveDown = new QPushButton(QStringLiteral("Move Down"));
-        openFolder = new QPushButton(QStringLiteral("Open Folder"));
+    modsAdd = new QPushButton(QStringLiteral("Add"));
+    modsRemove = new QPushButton(QStringLiteral("Remove"));
+    modsMoveUp = new QPushButton(QStringLiteral("Move Up"));
+    modsMoveDown = new QPushButton(QStringLiteral("Move Down"));
+    openFolder = new QPushButton(QStringLiteral("Open Folder"));
 
-		connect(mods->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ModsPage::onSelect);
+    connect(mods->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ModsPage::onModsSelect);
 
-		remove->setDisabled(true);
-		moveUp->setDisabled(true);
-		moveDown->setDisabled(true);
+    modsRemove->setDisabled(true);
+    modsMoveUp->setDisabled(true);
+    modsMoveDown->setDisabled(true);
 
-		connect(add, &QPushButton::clicked, [this]() {
-			QStringList files = QFileDialog::getOpenFileNames(
-				nullptr,
-				QStringLiteral("Open Mods Jar"),
-				{},
-				QStringLiteral("Weave Mod (*.jar)")
-			);
+    connect(modsAdd, &QPushButton::clicked, [this]() {
+        QStringList files = QFileDialog::getOpenFileNames(
+            nullptr, QStringLiteral("Open Mods Jar"), {}, QStringLiteral("Weave Mod (*.jar)")
+        );
+        for (const QString& str : files) {
+            modsModel->addMod(QFileInfo(str));
+        }
+        mods->selectRow(modsModel->rowCount(QModelIndex()) - 1);
+    });
 
-			for (const QString& str : files) {
-				model->addMod(QFileInfo(str));
-			}
+    connect(modsRemove, &QPushButton::clicked, [this]() {
+        for (const QModelIndex& item : mods->selectionModel()->selectedRows()) {
+            modsModel->removeRow(item.row());
+        }
+    });
 
-			mods->selectRow(model->rowCount(QModelIndex()) - 1);
-			});
+    connect(modsMoveUp, &QPushButton::clicked, [this]() {
+        QModelIndexList selected = mods->selectionModel()->selectedRows();
+        if (!selected.isEmpty()) {
+            int currentRow = selected[0].row();
+            if (currentRow > 0) {
+                modsModel->moveRow(QModelIndex(), currentRow - 1, QModelIndex(), currentRow + 1);
+            }
+        }
+    });
 
-		connect(remove, &QPushButton::clicked, [this]() {
-			for (const QModelIndex& item : mods->selectionModel()->selectedRows()) {
-				model->removeRow(item.row());
-			}
-			});
+    connect(modsMoveDown, &QPushButton::clicked, [this]() {
+        QModelIndexList selected = mods->selectionModel()->selectedRows();
+        if (!selected.isEmpty()) {
+            int currentRow = selected[0].row();
+            if (currentRow < modsModel->rowCount(QModelIndex()) - 1) {
+                modsModel->moveRow(QModelIndex(), currentRow, QModelIndex(), currentRow + 2);
+            }
+        }
+    });
 
-		connect(moveUp, &QPushButton::clicked, [this]() {
-			QModelIndexList selected = mods->selectionModel()->selectedRows();
-			if (!selected.isEmpty()) {
-				int currentRow = selected[0].row();
-				if (currentRow > 0) {
-					model->moveRow(QModelIndex(), currentRow - 1, QModelIndex(), currentRow + 1);
-				}
-			}
-			});
+    connect(openFolder, &QPushButton::clicked, []() {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(FS::getWeaveModsDirectory()));
+    });
 
-		connect(moveDown, &QPushButton::clicked, [this]() {
-			QModelIndexList selected = mods->selectionModel()->selectedRows();
-			if (!selected.isEmpty()) {
-				int currentRow = selected[0].row();
-				if (currentRow < model->rowCount(QModelIndex()) - 1) {
-					model->moveRow(QModelIndex(), currentRow, QModelIndex(), currentRow + 2);
-				}
-			}
-			});
+    QGridLayout* modsContainer = new QGridLayout();
+    modsContainer->setSpacing(6);
+    modsContainer->addWidget(mods, 0, 0, 6, 1);
+    modsContainer->addWidget(modsAdd, 0, 1);
+    modsContainer->addWidget(modsRemove, 1, 1);
+    modsContainer->addWidget(modsMoveUp, 2, 1);
+    modsContainer->addWidget(modsMoveDown, 3, 1);
+    modsContainer->addWidget(openFolder, 4, 1);
 
-        connect(openFolder, &QPushButton::clicked, []() {
-            QDesktopServices::openUrl(QUrl::fromLocalFile(FS::getWeaveModsDirectory()));
-        });
+    // --- Java Agents Section ---
+    QLabel* agentsLabel = new QLabel(QStringLiteral("Java Agents"));
 
-		QGridLayout* modsContainer = new QGridLayout();
-		modsContainer->setSpacing(6);
-		modsContainer->addWidget(mods, 0, 0, 6, 1);
-		modsContainer->addWidget(add, 0, 1);
-		modsContainer->addWidget(remove, 1, 1);
-		modsContainer->addWidget(moveUp, 2, 1);
-		modsContainer->addWidget(moveDown, 3, 1);
-        modsContainer->addWidget(openFolder, 4, 1);
+    agents = new AgentsView(this);
+    agents->setModel((agentsModel = new AgentsModel(config.agents, this)));
 
-		mainLayout->addLayout(modsContainer, 1);
+    agentsAdd = new QPushButton(QStringLiteral("Add"));
+    agentsRemove = new QPushButton(QStringLiteral("Remove"));
+    agentsMoveUp = new QPushButton(QStringLiteral("Move Up"));
+    agentsMoveDown = new QPushButton(QStringLiteral("Move Down"));
 
+    connect(agents->selectionModel(), &QItemSelectionModel::selectionChanged, this, &ModsPage::onAgentsSelect);
 
-		setLayout(mainLayout);
+    agentsRemove->setDisabled(true);
+    agentsMoveUp->setDisabled(true);
+    agentsMoveDown->setDisabled(true);
+
+    connect(agentsAdd, &QPushButton::clicked, [this]() {
+        QStringList files = QFileDialog::getOpenFileNames(
+                nullptr, QStringLiteral("Open Agent Jar"), {}, QStringLiteral("Java Agent (*.jar)")
+        );
+        for(const QString& str : files){
+            agentsModel->addAgent(str, {});
+        }
+        agents->selectRow(agentsModel->rowCount(QModelIndex()) - 1);
+    });
+
+    connect(agentsRemove, &QPushButton::clicked, [this]() {
+        for(const QModelIndex& item : agents->selectionModel()->selectedRows()){
+            agentsModel->removeRow(item.row());
+        }
+    });
+
+    connect(agentsMoveUp, &QPushButton::clicked, [this]() {
+        QModelIndexList selected = agents->selectionModel()->selectedRows();
+        if(!selected.isEmpty()){
+            int currentRow = selected[0].row();
+            if(currentRow > 0){
+                agentsModel->moveRow(QModelIndex(), currentRow - 1, QModelIndex(), currentRow + 1);
+            }
+        }
+    });
+
+    connect(agentsMoveDown, &QPushButton::clicked, [this]() {
+        QModelIndexList selected = agents->selectionModel()->selectedRows();
+        if(!selected.isEmpty()){
+            int currentRow = selected[0].row();
+            if(currentRow < agentsModel->rowCount(QModelIndex()) - 1){
+                agentsModel->moveRow(QModelIndex(), currentRow, QModelIndex(), currentRow + 2);
+            }
+        }
+    });
+
+    QGridLayout* agentsContainer = new QGridLayout();
+    agentsContainer->setSpacing(6);
+    agentsContainer->addWidget(agents, 0, 0, 5, 1);
+    agentsContainer->addWidget(agentsAdd, 0, 1);
+    agentsContainer->addWidget(agentsRemove, 1, 1);
+    agentsContainer->addWidget(agentsMoveUp, 2, 1);
+    agentsContainer->addWidget(agentsMoveDown, 3, 1);
+
+    mainLayout->addLayout(weaveHeaderLayout);
+    mainLayout->addLayout(modsContainer, 1);
+    mainLayout->addWidget(agentsLabel);
+    mainLayout->addLayout(agentsContainer, 1);
+
+    setLayout(mainLayout);
 }
 
-
 QString ModsPage::title() {
-	return QStringLiteral("Mods");
+    return QStringLiteral("Mods");
 }
 
 QIcon ModsPage::icon() {
-	return QIcon(":/res/icons/mod.svg");
+    return QIcon(":/res/icons/mod.svg");
 }
 
 void ModsPage::apply() {
-	config.useWeave = useWeave->isChecked();
+    config.useWeave = useWeave->isChecked();
 }
 
 void ModsPage::load() {
-	useWeave->setChecked(config.useWeave);
+    useWeave->setChecked(config.useWeave);
 }
 
-void ModsPage::onSelect(const QItemSelection& selected, const QItemSelection& deselected) {
-	QModelIndexList selectedRows = qobject_cast<QItemSelectionModel*>(sender())->selectedRows();
+void ModsPage::onModsSelect(const QItemSelection& selected, const QItemSelection& deselected) {
+    QModelIndexList selectedRows = qobject_cast<QItemSelectionModel*>(sender())->selectedRows();
 
-	if (selectedRows.isEmpty()) {
-		remove->setDisabled(true);
-		moveUp->setDisabled(true);
-		moveDown->setDisabled(true);
-	}
-	else {
-		remove->setEnabled(true);
-		moveUp->setEnabled(true);
-		moveDown->setEnabled(true);
-	}
+    if (selectedRows.isEmpty()) {
+        modsRemove->setDisabled(true);
+        modsMoveUp->setDisabled(true);
+        modsMoveDown->setDisabled(true);
+    }
+    else {
+        modsRemove->setEnabled(true);
+        modsMoveUp->setEnabled(true);
+        modsMoveDown->setEnabled(true);
+    }
+}
+
+void ModsPage::onAgentsSelect(const QItemSelection& selected, const QItemSelection& deselected) {
+    QModelIndexList selectedRows = qobject_cast<QItemSelectionModel*>(sender())->selectedRows();
+
+    if (selectedRows.isEmpty()) {
+        agentsRemove->setDisabled(true);
+        agentsMoveUp->setDisabled(true);
+        agentsMoveDown->setDisabled(true);
+    }
+    else {
+        agentsRemove->setEnabled(true);
+        agentsMoveUp->setEnabled(true);
+        agentsMoveDown->setEnabled(true);
+    }
 }
 
 QString ModsPage::description() {
-	return "List of Weave mods you want to use. Remember to enable Weave or add it in the agents tab first! Don't add any Forge/Fabric mods.";
+    return "List of Weave mods and Java agents.";
 }

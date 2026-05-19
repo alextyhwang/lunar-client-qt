@@ -7,7 +7,7 @@
 
 #include <QSlider>
 #include <QPlainTextEdit>
-#include <QRadioButton>
+#include <QCheckBox>
 
 #include "configurationpage.h"
 #include "gui/widgets/filechooser.h"
@@ -28,7 +28,7 @@ private:
     FileChooser* jrePath;
     FileChooser* minecraftPathChooser;
     QPushButton* openDataFolder;
-    QRadioButton* closeOnLaunch;
+    QCheckBox* closeOnLaunch;
     QPlainTextEdit* jvmArgs;
 };
 

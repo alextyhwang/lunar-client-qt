@@ -16,9 +16,17 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QTimer>
 
 #include "util/fs.h"
 #include "util/utils.h"
+
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 OfflineLauncher::OfflineLauncher(const Config& config, const bool useCustomAssetIndex, const QString& customAssetIndex, QObject *parent) : Launcher(config, useCustomAssetIndex, customAssetIndex, parent) {
 }
@@ -141,7 +149,16 @@ bool OfflineLauncher::launch() {
 
     process = new QProcess(qApp);
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, &OfflineLauncher::onProcessFinished);
-    process->setProgram(config.useCustomJre ? config.customJrePath : findJavaExecutable());
+    QString executable = config.useCustomJre ? resolveJavaExecutable(config.customJrePath) : findJavaExecutable(config.gameVersion);
+
+    if (executable.isEmpty() || !QFileInfo(executable).isExecutable()) {
+        emit error("Unable to find a valid Java executable.\nCheck the JRE Path in Game settings.");
+        process->deleteLater();
+        process = nullptr;
+        return false;
+    }
+
+    process->setProgram(executable);
     process->setStandardInputFile(QProcess::nullDevice());
 
     QString workingDir = FS::combinePaths(
@@ -261,6 +278,7 @@ bool OfflineLauncher::launch() {
     }
 
     launchedPid = process->processId();
+    scheduleMinecraftWindowIcon(launchedPid);
     emit processStarted();
 
     if (!config.helpers.isEmpty())
@@ -272,10 +290,21 @@ bool OfflineLauncher::launch() {
     return true;
 }
 
-QString OfflineLauncher::findJavaExecutable() {
+QString OfflineLauncher::findJavaExecutable(const QString& gameVersion) {
     QDir jreDir = QDir(FS::combinePaths(FS::getLunarDirectory(), "jre"));
 
     QFileInfoList jreSubDirs = jreDir.entryInfoList(QDir::Dirs, QDir::Time | QDir::Reversed);
+
+    QString targetJrePrefix = QStringLiteral("zulu17");
+    if (gameVersion.startsWith(QStringLiteral("1.7")) || 
+        gameVersion.startsWith(QStringLiteral("1.8")) || 
+        gameVersion.startsWith(QStringLiteral("1.12"))) {
+        targetJrePrefix = QStringLiteral("zulu8");
+    } else if (gameVersion.startsWith(QStringLiteral("1.16"))) {
+        targetJrePrefix = QStringLiteral("zulu16");
+    }
+
+    QString fallbackExecutable;
 
     for (QFileInfo jreSubDir : jreSubDirs) {
 
@@ -296,8 +325,55 @@ QString OfflineLauncher::findJavaExecutable() {
 
             );
 
-            if (QFileInfo(potentialExecutable).isExecutable())
-                return potentialExecutable;
+            if (QFileInfo(potentialExecutable).isExecutable()) {
+                if (jreSubDirSubDir.fileName().startsWith(targetJrePrefix, Qt::CaseInsensitive)) {
+                    return potentialExecutable;
+                }
+                if (fallbackExecutable.isEmpty()) {
+                    fallbackExecutable = potentialExecutable;
+                }
+            }
+        }
+    }
+
+    return fallbackExecutable;
+}
+
+QString OfflineLauncher::resolveJavaExecutable(const QString& path) {
+    QString trimmedPath = QDir::fromNativeSeparators(path.trimmed());
+    if (trimmedPath.isEmpty())
+        return {};
+
+    QFileInfo info(trimmedPath);
+    if (info.isFile()) {
+#ifdef Q_OS_WIN
+        if (info.fileName().compare(QStringLiteral("java.exe"), Qt::CaseInsensitive) == 0) {
+            QString javaw = FS::combinePaths(info.absolutePath(), QStringLiteral("javaw.exe"));
+            if (QFileInfo(javaw).isExecutable())
+                return javaw;
+        }
+#endif
+        return info.absoluteFilePath();
+    }
+
+    if (!info.isDir())
+        return {};
+
+    QStringList candidateDirs;
+    candidateDirs << info.absoluteFilePath();
+    if (info.fileName().compare(QStringLiteral("bin"), Qt::CaseInsensitive) != 0)
+        candidateDirs << FS::combinePaths(info.absoluteFilePath(), QStringLiteral("bin"));
+
+    for (const QString& candidateDir : candidateDirs) {
+#ifdef Q_OS_WIN
+        const QStringList executableNames{QStringLiteral("javaw.exe"), QStringLiteral("java.exe")};
+#else
+        const QStringList executableNames{QStringLiteral("java")};
+#endif
+        for (const QString& executableName : executableNames) {
+            QString executable = FS::combinePaths(candidateDir, executableName);
+            if (QFileInfo(executable).isExecutable())
+                return executable;
         }
     }
 
@@ -314,4 +390,49 @@ void OfflineLauncher::HelperLaunch(const QString& helper) {
 #endif
     process.setProgram(helper);
     process.startDetached(); 
+}
+
+void OfflineLauncher::scheduleMinecraftWindowIcon(qint64 pid) {
+#ifdef Q_OS_WIN
+    const QList<int> delays{500, 1500, 3000, 6000, 10000};
+    for (int delay : delays) {
+        QTimer::singleShot(delay, [pid]() {
+            struct IconContext {
+                DWORD pid;
+                HICON largeIcon;
+                HICON smallIcon;
+            };
+
+            QString iconPath = FS::combinePaths(qApp->applicationDirPath(), QStringLiteral("minecraft.ico"));
+            if (!QFileInfo::exists(iconPath))
+                return;
+
+            std::wstring nativeIconPath = QDir::toNativeSeparators(iconPath).toStdWString();
+            IconContext context{
+                static_cast<DWORD>(pid),
+                static_cast<HICON>(LoadImageW(nullptr, nativeIconPath.c_str(), IMAGE_ICON, 32, 32, LR_LOADFROMFILE)),
+                static_cast<HICON>(LoadImageW(nullptr, nativeIconPath.c_str(), IMAGE_ICON, 16, 16, LR_LOADFROMFILE))
+            };
+
+            if (!context.largeIcon || !context.smallIcon)
+                return;
+
+            EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+                IconContext* context = reinterpret_cast<IconContext*>(lParam);
+                DWORD windowPid = 0;
+                GetWindowThreadProcessId(hwnd, &windowPid);
+                if (windowPid != context->pid || !IsWindowVisible(hwnd))
+                    return TRUE;
+
+                SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(context->largeIcon));
+                SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(context->smallIcon));
+                SetClassLongPtrW(hwnd, GCLP_HICON, reinterpret_cast<LONG_PTR>(context->largeIcon));
+                SetClassLongPtrW(hwnd, GCLP_HICONSM, reinterpret_cast<LONG_PTR>(context->smallIcon));
+                return FALSE;
+            }, reinterpret_cast<LPARAM>(&context));
+        });
+    }
+#else
+    Q_UNUSED(pid);
+#endif
 }

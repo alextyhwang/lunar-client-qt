@@ -9,6 +9,8 @@
 #include "configurationpage.h"
 #include "gui/mods/modsmodel.h"
 #include "gui/mods/modsview.h"
+#include "gui/agents/agentsmodel.h"
+#include "gui/agents/agentsview.h"
 
 class ModsPage : public ConfigurationPage {
     Q_OBJECT
@@ -24,19 +26,27 @@ public:
     void apply() override;
     void load() override;
 private slots:
-    void onSelect(const QItemSelection& selected, const QItemSelection& deselected);
+    void onModsSelect(const QItemSelection& selected, const QItemSelection& deselected);
+    void onAgentsSelect(const QItemSelection& selected, const QItemSelection& deselected);
 
 private:
-    ModsModel* model;
+    ModsModel* modsModel;
     ModsView* mods;
     QCheckBox* useWeave;
 
-    QPushButton* add;
-    QPushButton* remove;
-    QPushButton* moveUp;
-    QPushButton* moveDown;
+    QPushButton* modsAdd;
+    QPushButton* modsRemove;
+    QPushButton* modsMoveUp;
+    QPushButton* modsMoveDown;
     QPushButton* openFolder;
-};
 
+    AgentsModel* agentsModel;
+    AgentsView* agents;
+
+    QPushButton* agentsAdd;
+    QPushButton* agentsRemove;
+    QPushButton* agentsMoveUp;
+    QPushButton* agentsMoveDown;
+};
 
 #endif //LUNAR_CLIENT_QT_MODSPAGE_H

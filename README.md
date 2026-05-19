@@ -37,6 +37,8 @@ It is common for people to use external programs such as overlays, proxies and c
 ## Performance Improvements
 This launcher is able to launch lunar client very quickly. The ability to use a custom JRE and JVM arguments opens up more possibilities for performance improvements. You can refer to [this](https://github.com/Youded-byte/Java-Optimisations-MC/blob/main/README.md) for advice.
 
+This fork defaults new configs to the Java-Optimisations-MC Community Edition JVM flags. For the intended setup, install GraalVM Community Edition Java 17 and set the Game tab's JRE Path to the GraalVM install folder, its `bin` folder, or the Java executable directly. See [PROJECT_SETUP.md](PROJECT_SETUP.md) for the local rebuild notes.
+
 
 ## Bugs
 Bugs and crashes are bound to happen as changes outside our control happen. If a crash happens it is likely due to old files being left over by lunar.

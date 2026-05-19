@@ -23,7 +23,9 @@ public:
     virtual void load() = 0;
 
 protected:
-    explicit ConfigurationPage(Config& config, QWidget* parent) : config(config), QWidget(parent) {};
+    explicit ConfigurationPage(Config& config, QWidget* parent) : config(config), QWidget(parent) {
+        setObjectName("configPage");
+    }
 
     Config& config;
 };

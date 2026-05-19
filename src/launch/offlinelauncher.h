@@ -29,9 +29,11 @@ private slots:
     void onProcessFinished(int exitCode, QProcess::ExitStatus status);
 
 private:
-    static QString findJavaExecutable();
+    static QString resolveJavaExecutable(const QString& path);
+    static QString findJavaExecutable(const QString& gameVersion);
     static void HelperLaunch(const QString& helper);
     static bool isPidRunning(qint64 pid);
+    static void scheduleMinecraftWindowIcon(qint64 pid);
 
     QProcess* process = nullptr;
     qint64 launchedPid = 0;

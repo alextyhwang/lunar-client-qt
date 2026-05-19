@@ -5,33 +5,42 @@
 #include "filechooser.h"
 #include <QHBoxLayout>
 #include <QFileDialog>
+#include <QEvent>
 
 FileChooser::FileChooser(QFileDialog::FileMode mode, QWidget *parent) : QWidget(parent){
     QHBoxLayout* layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
 
     pathEdit = new QLineEdit();
-    QPushButton* button = new QPushButton();
-    button->setIcon(QIcon(":/res/icons/openfolder.svg"));
+    pathEdit->setCursor(Qt::PointingHandCursor);
+    pathEdit->setReadOnly(true); // Make it act like a button
 
-    connect(pathEdit, &QLineEdit::returnPressed, [this](){pathEdit->clearFocus();});
+    // When clicked, open the file dialog
+    // We'll use event filter to detect clicks on the line edit
+    pathEdit->installEventFilter(this);
 
-    connect(button, &QPushButton::clicked, [mode, this](){
+    // Save mode to use in event filter
+    this->dialogMode = mode;
+
+    layout->addWidget(pathEdit);
+}
+
+bool FileChooser::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == pathEdit && event->type() == QEvent::MouseButtonRelease) {
         QFileDialog fileDialog;
-        fileDialog.setFileMode(mode);
-        if(mode == QFileDialog::Directory)
+        fileDialog.setFileMode(dialogMode);
+        if (dialogMode == QFileDialog::Directory)
             fileDialog.setOption(QFileDialog::ShowDirsOnly);
-        if(fileDialog.exec()==QDialog::Accepted){
+        if (fileDialog.exec() == QDialog::Accepted) {
             QStringList files = fileDialog.selectedFiles();
-            if(files.length() > 0){
+            if (files.length() > 0) {
                 pathEdit->setText(files[0]);
             }
         }
-    });
-
-
-    layout->addWidget(pathEdit);
-    layout->addWidget(button);
+        return true;
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 QString FileChooser::getPath() {

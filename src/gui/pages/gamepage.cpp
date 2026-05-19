@@ -9,7 +9,7 @@
 #include <QPushButton>
 #include <QFileDialog>
 #include <QGroupBox>
-#include <QRadioButton>
+#include <QCheckBox>
 
 #include "gui/widgets/filechooser.h"
 #include "gui/widgets/widgetutils.h"
@@ -38,64 +38,69 @@ unsigned long long getSystemMemory() {
 
 GamePage::GamePage(Config& config, QWidget *parent) : ConfigurationPage(config, parent) {
     QVBoxLayout* mainLayout = new QVBoxLayout();
-    mainLayout->setSpacing(40);
+    mainLayout->setSpacing(16); // Even spacing between elements
+    mainLayout->setContentsMargins(18, 0, 18, 14); // Match figma padding for config page
 
     unsigned long long systemMemory = getSystemMemory();
     size_t mibMemory = (size_t)(systemMemory / 1024 / 1024);
     size_t pageStep = (size_t)(mibMemory / 16);
 
-    QLabel* memoryLabel = new QLabel();
+    QHBoxLayout* memLabelLayout = new QHBoxLayout();
+    QLabel* memoryLabel = new QLabel(QStringLiteral("Memory"));
+    QLabel* memoryValLabel = new QLabel();
+    memLabelLayout->addWidget(memoryLabel);
+    memLabelLayout->addStretch();
+    memLabelLayout->addWidget(memoryValLabel);
+
     memorySlider = new QSlider(Qt::Horizontal);
     memorySlider->setMinimum(1024);
     memorySlider->setMaximum(mibMemory);
     memorySlider->setPageStep(pageStep);
 
-    connect(memorySlider, &QSlider::valueChanged, [memoryLabel](int val){memoryLabel->setText(QStringLiteral("Memory: ") + QString::number(val) + QStringLiteral(" MiB"));});
+    memoryValLabel->setStyleSheet("color: #BFBFBF; font-size: 16px;");
+    connect(memorySlider, &QSlider::valueChanged, [memoryValLabel](int val){
+        double gb = val / 1024.0;
+        memoryValLabel->setText(QString::number(gb, 'f', 1) + QStringLiteral("GB"));
+    });
 
     QVBoxLayout* memorySliderContainer = new QVBoxLayout();
-    memorySliderContainer->setSpacing(6);
-    memorySliderContainer->addWidget(memoryLabel, 0, Qt::AlignHCenter);
+    memorySliderContainer->setSpacing(4);
+    memorySliderContainer->addLayout(memLabelLayout);
     memorySliderContainer->addWidget(memorySlider);
 
     QVBoxLayout* jreContainer = new QVBoxLayout();
-    jreContainer->setSpacing(6);
-    jreContainer->addWidget(new QLabel(QStringLiteral("Custom JRE path (leave empty for default)")), 0, Qt::AlignHCenter);
+    jreContainer->setSpacing(4);
+    jreContainer->addWidget(new QLabel(QStringLiteral("JRE Path")), 0, Qt::AlignLeft);
     jrePath = new FileChooser(QFileDialog::ExistingFile);
     jreContainer->addWidget(jrePath);
 
     QVBoxLayout* minecraftContainer = new QVBoxLayout();
-    minecraftContainer->setSpacing(6);
-    minecraftContainer->addWidget(new QLabel(QStringLiteral("Minecraft directory (leave empty for default)")), 0, Qt::AlignHCenter);
+    minecraftContainer->setSpacing(4);
+    minecraftContainer->addWidget(new QLabel(QStringLiteral("Minecraft Path")), 0, Qt::AlignLeft);
     minecraftPathChooser = new FileChooser(QFileDialog::Directory);
     minecraftContainer->addWidget(minecraftPathChooser);
 
     QVBoxLayout* jvmArgsGroup = new QVBoxLayout();
-    jvmArgsGroup->setSpacing(6);
+    jvmArgsGroup->setSpacing(4);
     jvmArgs = new QPlainTextEdit();
-    jvmArgsGroup->addWidget(new QLabel(QStringLiteral("JVM Arguments")), 0, Qt::AlignHCenter);
+    jvmArgs->setMinimumHeight(126); // Match figma size
+    jvmArgs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    jvmArgsGroup->addWidget(new QLabel(QStringLiteral("Custom JVM Arguments")), 0, Qt::AlignLeft);
     jvmArgsGroup->addWidget(jvmArgs);
 
-    QGroupBox* groupBox = new QGroupBox(QStringLiteral("After Launch"));
-    QRadioButton* stayOpen = new QRadioButton(QStringLiteral("Keep Launcher Open"));
-    closeOnLaunch = new QRadioButton(QStringLiteral("Close Launcher"));
-    stayOpen->setChecked(true);
-    QVBoxLayout* radioLayout = new QVBoxLayout();
-    radioLayout->setSpacing(6);
-    radioLayout->addWidget(stayOpen);
-    radioLayout->addWidget(closeOnLaunch);
-    groupBox->setLayout(radioLayout);
-
-    openDataFolder = new QPushButton(QStringLiteral("Open Configuration Folder"));
-    connect(openDataFolder, &QPushButton::clicked, []() {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/atw-client/"));
-    });
+    QHBoxLayout* toggleLayout = new QHBoxLayout();
+    toggleLayout->addWidget(new QLabel(QStringLiteral("Launcher Open after Launch")));
+    closeOnLaunch = new QCheckBox();
+    closeOnLaunch->setChecked(!config.closeOnLaunch); // Note: we should probably map this properly
+    toggleLayout->addStretch();
+    toggleLayout->addWidget(closeOnLaunch);
 
     mainLayout->addLayout(memorySliderContainer);
-    mainLayout->addLayout(jreContainer);
     mainLayout->addLayout(minecraftContainer);
-    mainLayout->addLayout(jvmArgsGroup, 1);
-    mainLayout->addWidget(groupBox);
-    mainLayout->addWidget(openDataFolder, 0, Qt::AlignHCenter);
+    mainLayout->addLayout(jreContainer);
+    mainLayout->addLayout(jvmArgsGroup);
+    mainLayout->addLayout(toggleLayout);
+    mainLayout->addStretch(1); // Push everything to the top
 
     setLayout(mainLayout);
 }
@@ -123,7 +128,7 @@ void GamePage::apply() {
     config.customMinecraftDir = mcPath;
 
     config.jvmArgs = jvmArgs->toPlainText();
-    config.closeOnLaunch = closeOnLaunch->isChecked();
+    config.closeOnLaunch = !closeOnLaunch->isChecked();
 }
 
 void GamePage::load() {
@@ -131,7 +136,7 @@ void GamePage::load() {
     jrePath->setPath(config.customJrePath);
     minecraftPathChooser->setPath(config.customMinecraftDir);
     jvmArgs->setPlainText(config.jvmArgs);
-    closeOnLaunch->setChecked(config.closeOnLaunch);
+    closeOnLaunch->setChecked(!config.closeOnLaunch);
 }
 
 QString GamePage::description() {

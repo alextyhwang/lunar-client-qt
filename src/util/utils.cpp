@@ -61,6 +61,10 @@ QString Utils::getVersionFile(const QString& version) {
     if (version.length() < 2)
         return QStringLiteral("v1_8");
 
+    // 1.8.9 uses v1_8 natives (same as 1.8), not v1_89
+    if (version == QStringLiteral("1.8.9"))
+        return QStringLiteral("v1_8");
+
     if (version.length() == 3)
         return QString(QStringLiteral("v") + version.at(0)) + QStringLiteral("_") + version.at(2);
 

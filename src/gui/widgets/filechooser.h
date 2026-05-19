@@ -17,8 +17,11 @@ public:
 
     QString getPath();
     void setPath(const QString& path);
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 private:
     QLineEdit* pathEdit;
+    QFileDialog::FileMode dialogMode;
 };
 
 

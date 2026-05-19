@@ -6,7 +6,7 @@
 #define LUNAR_CLIENT_QT_MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QTabWidget>
+#include "widgets/customtabwidget.h"
 #include <QPushButton>
 #include <QTimer>
 #include <QStandardPaths>
@@ -15,10 +15,9 @@
 #include "launch/launcher.h"
 #include "pages/configurationpage.h"
 #include "pages/gamepage.h"
-#include "pages/agentspage.h"
 #include "pages/modspage.h"
-#include "pages/helperspage.h"
-#include "pages/logspage.h"
+#include "pages/otherpage.h"
+#include "pages/packspage.h"
 #include "config/config.h"
 
 #ifdef INCLUDE_UPDATER
@@ -45,7 +44,7 @@ private slots:
     void noUpdatesAvailable();
 #endif
 private:
-    QTabWidget* tabWidget;
+    CustomTabWidget* tabWidget;
     QPushButton* launchButton;
 
     QList<ConfigurationPage*> pages;

@@ -52,6 +52,7 @@ public:
     QString jvmArgs;
 
     bool closeOnLaunch;
+    bool autoLaunchOnOpen;
 
     bool useCustomMinecraftDir;
     QString customMinecraftDir;

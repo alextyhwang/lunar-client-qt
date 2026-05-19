@@ -91,12 +91,22 @@ set(SOURCE_FILES
         src/gui/pages/modspage.h
         src/gui/pages/helperspage.cpp
         src/gui/pages/helperspage.h
+        src/gui/pages/otherpage.cpp
+        src/gui/pages/otherpage.h
+        src/gui/pages/packspage.cpp
+        src/gui/pages/packspage.h
         src/launch/launcher.h
         src/launch/launcher.cpp
         src/config/config.cpp
         src/config/config.h
         src/gui/widgets/filechooser.cpp
         src/gui/widgets/filechooser.h
+        src/gui/widgets/customtitlebar.cpp
+        src/gui/widgets/customtitlebar.h
+        src/gui/widgets/customtabbar.cpp
+        src/gui/widgets/customtabbar.h
+        src/gui/widgets/customtabwidget.cpp
+        src/gui/widgets/customtabwidget.h
         src/gui/widgets/widgetutils.cpp
         src/gui/widgets/widgetutils.h
         src/buildconfig.h
@@ -172,6 +182,7 @@ add_dependencies(atw-client CopyJars)
 # ----------------------- Copy application icon ------------------------------
 
 configure_file(${CMAKE_SOURCE_DIR}/res/icon.ico ${CMAKE_BINARY_DIR}/icon.ico COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/res/minecraft.ico ${CMAKE_BINARY_DIR}/minecraft.ico COPYONLY)
 
 # Embed icon in Windows executable (for taskbar pin, Explorer, etc.)
 if(WIN32)

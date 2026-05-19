@@ -1,6 +1,8 @@
 #include <QApplication>
 #include <QStandardPaths>
 #include <QCommandLineParser>
+#include <QFontDatabase>
+#include <QFileInfo>
 
 #include "gui/mainwindow.h"
 #include "launch/offlinelauncher.h"
@@ -9,6 +11,46 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("atw-client"));
 
+    // Use Fusion style for consistent cross-platform look (avoids Windows native inputs)
+    app.setStyle(QStringLiteral("Fusion"));
+
+    // Add font explicitly from memory and configure it directly
+        QString fontPath = QStringLiteral("C:/Users/awang/Downloads/Minecraft/Minecraft-Regular.otf");
+    if (!QFileInfo::exists(fontPath))
+        fontPath = QStringLiteral("C:/Users/awang/Downloads/Minecraft/Minecraft-Medium.otf");
+    if (!QFileInfo::exists(fontPath))
+        fontPath = QStringLiteral("C:/Users/awang/Downloads/Minecraft/Minecraft-Medium.ttf");
+    if (!QFileInfo::exists(fontPath))
+        fontPath = QStringLiteral("C:/Users/awang/Downloads/Minecraft/Minecraft.ttf");
+    if (!QFileInfo::exists(fontPath))
+        fontPath = QStringLiteral(":/res/fonts/Minecraft.ttf");
+    if (!QFileInfo::exists(fontPath))
+        fontPath = QStringLiteral(":/res/fonts/Minecraft-Regular.ttf");
+
+    // Font already handles capitalization correctly now that text-transform: none is set
+    int fontId = QFontDatabase::addApplicationFont(fontPath);
+    QString fontFamily = QStringLiteral("Minecraft");
+    if (fontId >= 0) {
+        QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+        if (!families.isEmpty()) {
+            for (const QString& f : families) {
+                if (f.contains("Medium", Qt::CaseInsensitive)) {
+                    fontFamily = f;
+                    break;
+                }
+            }
+            if (fontFamily == QStringLiteral("Minecraft")) {
+                fontFamily = families.first();
+            }
+            QFont mainFont(fontFamily, 14);
+            mainFont.setStyleStrategy(QFont::PreferAntialias);
+            mainFont.setWeight(QFont::Medium);
+            // Tell Qt we specifically want the font family string to just work
+            mainFont.setFamily(fontFamily);
+            app.setFont(mainFont);
+        }
+    }
+
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();  
@@ -16,6 +58,10 @@ int main(int argc, char *argv[]) {
     QCommandLineOption noGuiOption("nogui",
         QCoreApplication::translate("main", "Launch ATW Client without GUI. Enables the use of overriding options"));
     parser.addOption(noGuiOption);
+
+    QCommandLineOption guiOption("gui",
+        QCoreApplication::translate("main", "Force the launcher GUI to open even when autoLaunchOnOpen is enabled"));
+    parser.addOption(guiOption);
 
     QCommandLineOption versionOption("gameVersion",
         QCoreApplication::translate("gameVersionOverride", "Override Minecraft version"),
@@ -39,8 +85,8 @@ int main(int argc, char *argv[]) {
 
     parser.process(app);
 
-    if (parser.isSet(noGuiOption)) {
-        Config config = Config::load();
+    Config config = Config::load();
+    if (parser.isSet(noGuiOption) || (config.autoLaunchOnOpen && !parser.isSet(guiOption))) {
         config.gameVersion = QStringLiteral("1.8.9");
         config.modLoader = QStringLiteral("Optifine");
         config.keepMemorySame = true;
