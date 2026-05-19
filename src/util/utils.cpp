@@ -22,6 +22,9 @@ QString Utils::getAssetsIndex(const QString &version) {
     if(version == "1.7")
         return "1.7.10";
 
+    if (version.startsWith("1.8"))
+        return "1.8";
+
     if (version == "1.19.3")
         return "2";
 
